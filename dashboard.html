@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UNI Athletics – Finance Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --bg: #0f1117;
@@ -170,26 +171,21 @@
     .traffic-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
     .rip-table-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
 
-    /* Loading overlay */
-    #loadingOverlay {
-      position: fixed; inset: 0; background: rgba(15,17,23,0.92);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      z-index: 9999; gap: 16px;
+    /* Upload button */
+    .upload-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 9px 18px; border: 1.5px solid var(--border); border-radius: 8px;
+      background: var(--surface2); color: var(--text-dim); font-size: 0.82rem;
+      font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap;
     }
-    .loader-ring {
-      width: 48px; height: 48px; border: 4px solid rgba(79,124,255,0.2);
-      border-top-color: #4f7cff; border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loader-text { font-size: 0.85rem; color: var(--muted); }
-    .loader-sub  { font-size: 0.72rem; color: var(--border); }
-    .sheets-badge {
+    .upload-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,124,255,0.08); }
+    .upload-btn svg { width: 15px; height: 15px; fill: currentColor; flex-shrink: 0; }
+    .data-badge {
       display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
       background: rgba(67,233,123,0.12); border: 1px solid rgba(67,233,123,0.3);
       border-radius: 20px; font-size: 0.72rem; color: #43e97b;
     }
-    .sheets-badge.error { background: rgba(255,107,107,0.1); border-color: rgba(255,107,107,0.3); color: var(--accent2); }
+    .data-badge.error { background: rgba(255,107,107,0.1); border-color: rgba(255,107,107,0.3); color: var(--accent2); }
 
     /* Export Button */
     .export-btn {
@@ -332,13 +328,6 @@
 </head>
 <body>
 
-<!-- Loading Overlay -->
-<div id="loadingOverlay" style="display:none;">
-  <div class="loader-ring"></div>
-  <div class="loader-text">Loading data from Google Sheets…</div>
-  <div class="loader-sub">Fetching Cost &amp; Revenue sheets</div>
-</div>
-
 <!-- PRINT COVER PAGE (hidden on screen, shown on print) -->
 <div class="print-cover" id="printCover">
   <div style="border-bottom:3px solid #1a56db; padding-bottom:16px; margin-bottom:32px;">
@@ -365,7 +354,14 @@
     <h1>UNI Athletics &mdash; Financial Dashboard</h1>
     <div style="margin-top:4px; font-size:0.8rem; color:var(--muted);">Expense &amp; Revenue Forecast · 2022–2028</div>
   </div>
-  <span id="dataSourceBadge" class="sheets-badge" style="display:none;">&#9679; Live from Google Sheets</span>
+  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+    <span id="dataSourceBadge" class="data-badge" style="display:none;"></span>
+    <label class="upload-btn" for="xlsxUpload" title="Load data from your Excel file — replaces the hardcoded numbers instantly">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5V9h4.5L13 3.5zM8 17l4-4 4 4h-3v3h-2v-3H8zm0-8h8v1.5H8V9z"/></svg>
+      Update Data
+    </label>
+    <input type="file" id="xlsxUpload" accept=".xlsx,.xls" style="display:none;">
+  </div>
   <div style="display:flex; align-items:center; gap:12px;">
     <span>Last updated: 2025-26 Budget</span>
     <button class="export-btn" onclick="window.print()" id="exportBtn">
@@ -538,13 +534,6 @@
 </div>
 
 <script>
-// ─── GOOGLE SHEETS CONFIG ─────────────────────────────────────────────────────────
-// Paste your values. Sheet must be shared “Anyone with the link can view”.
-const SHEETS_CONFIG = {
-  apiKey:  'AIzaSyAuwukZtynTS1mtBeb2xOxTNbdqsgAeJvs',   // Google Cloud Console → Credentials
-  sheetId: 'https://docs.google.com/spreadsheets/d/1UJTRNxGQpjHJHNLuGaNxggqQf1S0dBgDtHVOt6IfHn0/edit?usp=sharing',  // docs.google.com/spreadsheets/d/XXXXX/edit
-};
-
 // ─── RAW DATA ─────────────────────────────────────────────────────────────────
 const years = [2022, 2023, 2024, 2025];
 const forecastYears = [2026, 2027, 2028];
@@ -1160,7 +1149,7 @@ function exportPDF() {
   window.print();
 }
 
-// ─── GOOGLE SHEETS LOADER ───────────────────────────────────────────────────────────
+// ─── EXCEL FILE LOADER ────────────────────────────────────────────────────────
 function parseNum(v) {
   if (!v && v !== 0) return 0;
   const s = String(v).replace(/[$,\s]/g, '');
@@ -1170,36 +1159,18 @@ function parseNum(v) {
   return isNaN(n) ? 0 : n;
 }
 
-async function loadFromSheets() {
-  const base = `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.sheetId}/values`;
-  const k    = `key=${SHEETS_CONFIG.apiKey}`;
+async function loadFromExcel(file) {
+  const buf  = await file.arrayBuffer();
+  const wb   = XLSX.read(buf, { type: 'array' });
 
-  const fetchSheet = async (range) => {
-    const url = `${base}/${range}?${k}`;
-    let res;
-    try { res = await fetch(url); }
-    catch (netErr) {
-      throw new Error(
-        `Network blocked fetching "${range}". ` +
-        `If your API key has HTTP-referrer restrictions, add localhost/* in Google Cloud Console → Credentials → your key → Application restrictions.`
-      );
-    }
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const msg  = body?.error?.message || res.statusText;
-      throw new Error(`Sheets API ${res.status} for "${range}": ${msg}`);
-    }
-    return res.json();
-  };
+  // ─ Cost sheet ─
+  const cws   = wb.Sheets['Cost'];
+  if (!cws) throw new Error('Sheet named "Cost" not found in workbook.');
+  const cData = XLSX.utils.sheet_to_json(cws, { header: 1, defval: '' });
 
-  const [cRes, rRes] = await Promise.all([
-    fetchSheet('Cost!A1:AK8'),
-    fetchSheet('Revenue!A1:K8'),
-  ]);
-
-  // Cost sheet: row 0 = headers, rows 1-4 = "2025-26" through "2022-23" fiscal year data.
-  const cRows   = (cRes.values || []).filter(r => r[0] && r[1] && /^\d{4}-\d{2}$/.test(String(r[0]).trim()));
+  // Match rows with fiscal-year label pattern "YYYY-YY" (skips header and numeric duplicates)
   const yearMap = { '2025-26': 2025, '2024-25': 2024, '2023-24': 2023, '2022-23': 2022 };
+  const cRows   = cData.filter(r => yearMap[String(r[0]).trim()]);
 
   const newCosts = {};
   cRows.forEach(r => {
@@ -1207,11 +1178,9 @@ async function loadFromSheets() {
     if (yr) newCosts[yr] = parseNum(r[1]);
   });
 
-  // Column AK (index 36) = NIL Revenue Share from 2025-26 row
   const row2025cost = cRows.find(r => String(r[0]).trim() === '2025-26') || [];
   const newNIL      = parseNum(row2025cost[36]) || NIL_BASE;
 
-  // Top expense categories from 2024-25 row
   const row2024cost = cRows.find(r => String(r[0]).trim() === '2024-25') || [];
   const newTopExp = [
     { name: 'Admin Salaries',          value: parseNum(row2024cost[9])  },
@@ -1226,8 +1195,12 @@ async function loadFromSheets() {
     { name: 'NIL Revenue Share',       value: newNIL },
   ];
 
-  // Revenue sheet: row 0 = headers, data rows have 4-digit year in col A (2025, 2024, …)
-  const rRows  = (rRes.values || []).filter(r => r[0] && /^\d{4}$/.test(String(r[0]).trim()));
+  // ─ Revenue sheet ─
+  const rws   = wb.Sheets['Revenue'];
+  if (!rws) throw new Error('Sheet named "Revenue" not found in workbook.');
+  const rData = XLSX.utils.sheet_to_json(rws, { header: 1, defval: '' });
+  const rRows = rData.filter(r => r[0] && /^\d{4}$/.test(String(r[0]).trim()));
+
   const newRevenue = {};
   const newRevMix  = {};
   const revLabels  = [
@@ -1272,42 +1245,33 @@ function initDashboard() {
   updateRatioCalc(30);
 }
 
-// ─── BOOTSTRAP ──────────────────────────────────────────────────────────────────────────────
-(async () => {
-  const overlay    = document.getElementById('loadingOverlay');
-  const badge      = document.getElementById('dataSourceBadge');
-  const configured = SHEETS_CONFIG.apiKey  !== 'PASTE_YOUR_API_KEY_HERE' &&
-                     SHEETS_CONFIG.sheetId !== 'PASTE_YOUR_SHEET_ID_HERE';
+// ─── BOOTSTRAP & UPLOAD HANDLER ───────────────────────────────────────────────
+initDashboard();
 
-  if (configured) {
-    overlay.style.display = 'flex';
-    try {
-      const d = await loadFromSheets();
-      Object.keys(d.newCosts).forEach(yr    => { costs[yr]       = d.newCosts[yr]; });
-      Object.keys(d.newRevenue).forEach(yr  => { revenue[yr]     = d.newRevenue[yr]; });
-      Object.keys(d.newRevMix).forEach(lbl  => { revMix2025[lbl] = d.newRevMix[lbl]; });
-      NIL_BASE = d.newNIL;
-      topExpenses2024.length = 0;
-      topExpenses2024.push(...d.newTopExp);
-      badge.textContent = '\u25cf Live \u2014 Google Sheets';
-      badge.style.display = 'inline-flex';
-    } catch (err) {
-      console.error('[Sheets] Load failed:', err);
-      const isFileProtocol = location.protocol === 'file:';
-      const msg = isFileProtocol
-        ? '\u26a0 Open via HTTP server (not file://) to load live data'
-        : '\u26a0 Sheets error: ' + (err.message || err);
-      badge.textContent = msg;
-      badge.classList.add('error');
-      badge.style.display = 'inline-flex';
-      badge.title = 'Full error: ' + (err.message || err) +
-        (isFileProtocol ? '\n\nFix: In terminal run:  python -m http.server 8080\nThen open:  http://localhost:8080/dashboard.html' : '');
-    }
-    overlay.style.display = 'none';
+document.getElementById('xlsxUpload').addEventListener('change', async function () {
+  const file  = this.files[0];
+  if (!file) return;
+  const badge = document.getElementById('dataSourceBadge');
+  badge.className = 'data-badge';
+  badge.textContent = 'Loading…';
+  badge.style.display = 'inline-flex';
+  try {
+    const d = await loadFromExcel(file);
+    Object.keys(d.newCosts).forEach(yr    => { costs[yr]        = d.newCosts[yr]; });
+    Object.keys(d.newRevenue).forEach(yr  => { revenue[yr]      = d.newRevenue[yr]; });
+    Object.keys(d.newRevMix).forEach(lbl  => { revMix2025[lbl]  = d.newRevMix[lbl]; });
+    NIL_BASE = d.newNIL;
+    topExpenses2024.length = 0;
+    topExpenses2024.push(...d.newTopExp);
+    badge.textContent = '\u25cf ' + file.name;
+    initDashboard();
+  } catch (err) {
+    console.error('[Excel load]', err);
+    badge.classList.add('error');
+    badge.textContent = '\u26a0 ' + (err.message || 'Could not read file');
   }
-
-  initDashboard();
-})();
+  this.value = ''; // allow re-uploading same file
+});
 </script>
 </body>
 </html>
