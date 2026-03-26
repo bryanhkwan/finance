@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UNI Athletics – Finance Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1c1f2e;
+      --surface2: #252840;
+      --border: #2e3250;
+      --accent: #4f7cff;
+      --accent2: #ff6b6b;
+      --accent3: #43e97b;
+      --muted: #8892b0;
+      --text: #e6e8f0;
+      --text-dim: #aab2cc;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
+    header span { font-size: 0.85rem; color: var(--muted); background: var(--surface); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); }
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .kpi label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 8px; }
+    .kpi .value { font-size: 1.7rem; font-weight: 700; }
+    .kpi .delta { font-size: 0.8rem; margin-top: 4px; }
+    .delta.up { color: var(--accent3); }
+    .delta.down { color: var(--accent2); }
+    .delta.neutral { color: var(--muted); }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h2 { font-size: 0.9rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+    canvas { width: 100% !important; }
+    /* Scenario controls */
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .slider-group label { font-size: 0.8rem; color: var(--text-dim); display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .slider-group label span { color: var(--accent); font-weight: 600; }
+    input[type=range] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .forecast-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .forecast-table th { text-align: left; color: var(--muted); font-weight: 500; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .forecast-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .forecast-table tr:last-child td { border-bottom: none; }
+    .forecast-table tr.forecast-row td { color: var(--text-dim); }
+    .forecast-table tr.forecast-row td:first-child { color: var(--accent); font-weight: 600; }
+    .forecast-table .trend-col { color: #a78bfa !important; font-style: italic; }
+    .forecast-table thead .trend-hdr { color: #a78bfa; }
+    .forecast-table .method-note { font-size: 0.72rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+    .tag.up { background: rgba(67,233,123,0.15); color: var(--accent3); }
+    .tag.down { background: rgba(255,107,107,0.15); color: var(--accent2); }
+    .tag.forecast { background: rgba(79,124,255,0.15); color: var(--accent); }
+    .note { font-size: 0.75rem; color: var(--muted); margin-top: 12px; padding: 10px 14px; background: rgba(79,124,255,0.07); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; }
+    .expense-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .exp-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+    .exp-row:last-child { border-bottom: none; }
+    .exp-bar { height: 4px; border-radius: 2px; background: var(--accent); margin-top: 3px; transition: width 0.3s; }
+    /* Explainer cards */
+    .explainer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .explainer-item { background: var(--surface2); border-radius: 10px; padding: 18px; border: 1px solid var(--border); }
+    .explainer-item.incoming { border-top: 3px solid var(--accent3); }
+    .explainer-item.outgoing { border-top: 3px solid var(--accent2); }
+    .explainer-item.strategy { border-top: 3px solid var(--accent); }
+    .explainer-badge { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+    .explainer-item.incoming .explainer-badge { color: var(--accent3); }
+    .explainer-item.outgoing .explainer-badge { color: var(--accent2); }
+    .explainer-item.strategy .explainer-badge { color: var(--accent); }
+    .explainer-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; }
+    .explainer-body { font-size: 0.8rem; color: var(--text-dim); line-height: 1.6; margin-bottom: 12px; }
+    .explainer-body strong { color: var(--text); }
+    .explainer-stat { font-size: 0.78rem; color: var(--muted); padding-top: 10px; border-top: 1px solid var(--border); }
+    .explainer-stat span { color: var(--text); font-weight: 600; }
+    .cap-bar-wrap { background: var(--border); border-radius: 4px; height: 6px; margin: 8px 0 4px; overflow: hidden; }
+    .cap-bar { height: 100%; border-radius: 4px; transition: width 0.4s; }
+    /* ── Rev Share Investment Planner ── */
+    .rip-context { background: var(--surface2); border-radius: 10px; padding: 18px 20px; margin-bottom: 20px; border-left: 4px solid var(--accent); font-size: 0.85rem; color: var(--text-dim); line-height: 1.7; }
+    .rip-context strong { color: var(--text); }
+    /* Hero answer callout */
+    .rip-hero { background: linear-gradient(135deg, rgba(79,124,255,0.12), rgba(67,233,123,0.08)); border: 1px solid rgba(79,124,255,0.3); border-radius: 14px; padding: 24px 28px; margin-bottom: 20px; }
+    .rip-hero-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 6px; }
+    .rip-hero-question { font-size: 1.05rem; font-weight: 700; color: var(--text); margin-bottom: 20px; }
+    .rip-hero-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .rip-stat { background: rgba(0,0,0,0.2); border-radius: 10px; padding: 14px 16px; }
+    .rip-stat-label { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; line-height: 1.4; }
+    .rip-stat-value { font-size: 1.35rem; font-weight: 700; }
+    .rip-stat.primary .rip-stat-value { color: var(--accent3); }
+    .rip-stat.secondary .rip-stat-value { color: var(--accent2); }
+    .rip-stat.neutral .rip-stat-value { color: var(--text); }
+    .rip-stat.highlight .rip-stat-value { color: var(--accent); }
+    .rip-cap-warning { display:none; margin-top:12px; padding: 10px 14px; background: rgba(255,107,107,0.1); border-radius:8px; font-size:0.8rem; color: var(--accent2); border: 1px solid rgba(255,107,107,0.3); }
+    /* Slider */
+    .rip-slider-wrap { background: var(--surface2); border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; border: 1px solid var(--border); }
+    .rip-slider-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+    .rip-slider-q { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+    .rip-slider-num { font-size: 2.2rem; font-weight: 800; color: var(--accent); line-height: 1; }
+    .rip-slider-ticks { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted); margin-top: 6px; }
+    /* Before/After */
+    .rip-ba { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 700px) { .rip-ba { grid-template-columns: 1fr; } }
+    .rip-ba-card { background: var(--surface2); border-radius: 10px; padding: 18px 20px; border: 1px solid var(--border); }
+    .rip-ba-card.before { border-top: 3px solid var(--muted); }
+    .rip-ba-card.after { border-top: 3px solid var(--accent); }
+    .rip-ba-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin-bottom: 14px; }
+    .rip-ba-card.before .rip-ba-title { color: var(--muted); }
+    .rip-ba-card.after .rip-ba-title { color: var(--accent); }
+    .rip-ba-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    .rip-ba-row:last-child { border-bottom: none; }
+    .rip-ba-row span:first-child { color: var(--text-dim); }
+    .rip-ba-row span:last-child { font-weight: 600; }
+    /* Scenario table */
+    .scenario-tbl-wrap { overflow-x: auto; }
+    .scenario-tbl { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .scenario-tbl th { text-align: left; color: var(--muted); font-weight: 500; padding: 9px 16px; border-bottom: 2px solid var(--border); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+    .scenario-tbl td { padding: 10px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .scenario-tbl tr:last-child td { border-bottom: none; }
+    .scenario-tbl tr.active-row td { background: rgba(79,124,255,0.1); }
+    .scenario-tbl tr.cap-row td { background: rgba(255,107,107,0.06); }
+    .traffic-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .rip-table-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+
+    /* Export Button */
+    .export-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 22px; border: none; border-radius: 8px;
+      background: linear-gradient(135deg, #4f7cff 0%, #6c63ff 100%);
+      color: #fff; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em;
+      box-shadow: 0 2px 12px rgba(79,124,255,0.25);
+    }
+    .export-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(79,124,255,0.4); }
+    .export-btn:active { transform: translateY(0); }
+    .export-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .export-btn svg { width: 16px; height: 16px; fill: currentColor; }
+    .export-progress { font-size: 0.75rem; color: var(--muted); margin-left: 8px; display: none; }
+
+    /* ══ PRINT STYLES ══════════════════════════════════════════════════════════ */
+    .print-cover { display: none; }
+
+    @media print {
+      /* Reset to white/light theme */
+      :root {
+        --bg: #ffffff;
+        --surface: #f7f8fc;
+        --surface2: #eef0f8;
+        --border: #d0d4e8;
+        --accent: #1a56db;
+        --accent2: #c0392b;
+        --accent3: #157a3f;
+        --muted: #555e7a;
+        --text: #0f1117;
+        --text-dim: #3a4060;
+      }
+
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+      body { background: #fff !important; color: #0f1117 !important; padding: 0 !important; font-size: 11pt; }
+
+      /* Hide interactive / screen-only elements */
+      .export-btn, .export-progress,
+      .rip-slider-wrap, .scenario-grid,
+      #sliders, .note { display: none !important; }
+
+      /* Show print cover */
+      .print-cover { display: block !important; page-break-after: always; }
+
+      /* Page breaks between major sections */
+      .print-break-before { page-break-before: always; }
+
+      /* Cards */
+      .card {
+        background: #f7f8fc !important;
+        border: 1px solid #d0d4e8 !important;
+        border-radius: 8px !important;
+        padding: 16px !important;
+        break-inside: avoid;
+        margin-bottom: 16px !important;
+      }
+      .card h2 { color: #3a4060 !important; border-bottom: 1px solid #d0d4e8; padding-bottom: 8px; margin-bottom: 12px; }
+
+      /* Header */
+      header { border-bottom: 2px solid #1a56db; padding-bottom: 10px; margin-bottom: 16px; }
+      header h1 { color: #0f1117 !important; }
+      header > div > div { color: #555e7a !important; }
+
+      /* KPI cards */
+      .kpi-row { grid-template-columns: repeat(4, 1fr) !important; gap: 10px !important; margin-bottom: 16px !important; }
+      .kpi { background: #f7f8fc !important; border: 1px solid #d0d4e8 !important; padding: 12px !important; }
+      .kpi label { color: #555e7a !important; }
+      .kpi .value { font-size: 1.2rem !important; color: #0f1117 !important; }
+      .delta.up { color: #157a3f !important; }
+      .delta.down { color: #c0392b !important; }
+      .delta.neutral { color: #555e7a !important; }
+
+      /* Grids */
+      .grid-2 { grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
+
+      /* Charts — fix height for print */
+      canvas { max-height: 200px !important; }
+
+      /* Explainer */
+      .explainer-grid { grid-template-columns: 1fr 1fr 1fr !important; gap: 10px !important; }
+      .explainer-item { background: #eef0f8 !important; border: 1px solid #d0d4e8 !important; }
+      .explainer-item.incoming { border-top: 3px solid #157a3f !important; }
+      .explainer-item.outgoing { border-top: 3px solid #c0392b !important; }
+      .explainer-item.strategy  { border-top: 3px solid #1a56db !important; }
+      .explainer-body { color: #3a4060 !important; }
+      .explainer-badge { font-size: 0.6rem !important; }
+
+      /* Rev Share Planner */
+      .rip-context { background: #eef0f8 !important; border-left: 4px solid #1a56db !important; color: #3a4060 !important; }
+      .rip-hero { background: #f0f4ff !important; border: 1px solid #b0c0f0 !important; }
+      .rip-hero-question { color: #0f1117 !important; }
+      .rip-stat { background: #eef0f8 !important; }
+      .rip-stat-label { color: #555e7a !important; }
+      .rip-stat.primary .rip-stat-value { color: #157a3f !important; }
+      .rip-stat.secondary .rip-stat-value { color: #c0392b !important; }
+      .rip-stat.highlight .rip-stat-value { color: #1a56db !important; }
+      .rip-stat.neutral .rip-stat-value { color: #0f1117 !important; }
+      .rip-ba { grid-template-columns: 1fr 1fr !important; }
+      .rip-ba-card { background: #f7f8fc !important; border: 1px solid #d0d4e8 !important; }
+      .rip-ba-card.before { border-top: 3px solid #888 !important; }
+      .rip-ba-card.after  { border-top: 3px solid #1a56db !important; }
+      .rip-ba-title { color: #3a4060 !important; }
+      .rip-ba-row span:first-child { color: #555e7a !important; }
+      .rip-ba-row { border-bottom-color: #d0d4e8 !important; }
+
+      /* Tables */
+      .forecast-table th, .scenario-tbl th { color: #555e7a !important; border-bottom-color: #d0d4e8 !important; }
+      .forecast-table td, .scenario-tbl td { border-bottom-color: #d0d4e8 !important; color: #0f1117 !important; }
+      .forecast-table .trend-col { color: #5b21b6 !important; }
+      .forecast-table thead .trend-hdr { color: #5b21b6 !important; }
+      .forecast-table tr.forecast-row td { color: #3a4060 !important; }
+      .forecast-table tr.forecast-row td:first-child { color: #1a56db !important; }
+      .scenario-tbl tr.active-row td { background: #e8f0fe !important; }
+      .scenario-tbl-wrap { overflow: visible !important; }
+      .tag.up { background: #dcfce7 !important; color: #157a3f !important; }
+      .tag.down { background: #fee2e2 !important; color: #c0392b !important; }
+      .tag.forecast { background: #dbeafe !important; color: #1a56db !important; }
+      .traffic-dot { border: 1px solid #999; }
+
+      /* Cap bar */
+      .cap-bar-wrap { background: #d0d4e8 !important; }
+
+      /* Expense breakdown bars */
+      .exp-bar { background: #1a56db !important; }
+      .exp-row { border-bottom-color: #d0d4e8 !important; }
+
+      /* Misc */
+      .rip-table-label { color: #555e7a !important; }
+      .rip-hero-label { color: #555e7a !important; }
+
+      /* Section page breaks */
+      #ripPlannerSection { page-break-before: always; }
+      #scenarioPlannerSection { page-break-before: always; }
+      #tablesSection { page-break-before: always; }
+      #breakdownSection { page-break-before: always; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- PRINT COVER PAGE (hidden on screen, shown on print) -->
+<div class="print-cover" id="printCover">
+  <div style="border-bottom:3px solid #1a56db; padding-bottom:16px; margin-bottom:32px;">
+    <div style="font-size:0.65rem; text-transform:uppercase; letter-spacing:0.15em; color:#555e7a; margin-bottom:8px;">Confidential &mdash; Internal Use Only</div>
+    <h1 style="font-size:2.2rem; font-weight:800; color:#0f1117; margin-bottom:6px;">UNI Athletics</h1>
+    <h2 style="font-size:1.5rem; font-weight:600; color:#1a56db; margin-bottom:12px;">Financial Analysis Report</h2>
+    <div style="font-size:0.95rem; color:#555e7a;">Expense &amp; Revenue Forecast &nbsp;&middot;&nbsp; 2022&ndash;2028 &nbsp;&middot;&nbsp; Based on 2025-26 Budget Data</div>
+  </div>
+
+  <div style="margin-bottom:28px;">
+    <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.1em; color:#555e7a; margin-bottom:12px; font-weight:700;">Executive Summary</div>
+    <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+      <tbody id="printCoverStats"></tbody>
+    </table>
+  </div>
+
+  <div style="margin-top:32px; padding-top:16px; border-top:1px solid #d0d4e8; font-size:0.75rem; color:#888;">
+    <span id="printCoverDate"></span> &nbsp;&nbsp;&middot;&nbsp;&nbsp; Forecasting method: OLS linear regression (2022&ndash;2025 actuals)
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>UNI Athletics &mdash; Financial Dashboard</h1>
+    <div style="margin-top:4px; font-size:0.8rem; color:var(--muted);">Expense &amp; Revenue Forecast · 2022–2028</div>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span>Last updated: 2025-26 Budget</span>
+    <button class="export-btn" onclick="window.print()" id="exportBtn">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 18h-2v-4H8l4-4 4 4h-3v4zm1-10V3.5L18.5 8H14z"/></svg>
+      Export PDF Report
+    </button>
+  </div>
+</header>
+
+<!-- KPI Cards -->
+<div class="kpi-row" id="kpiRow"></div>
+
+<!-- Main Charts -->
+<div class="grid-2">
+  <div class="card">
+    <h2>Total Expenses vs Athletics-Generated Revenue (Actuals + OLS Trend + Scenario)</h2>
+    <canvas id="overviewChart" height="260"></canvas>
+    <p class="note">Revenue reflects athletics-generated sources only — ticket sales, fundraising, media rights, NCAA/conference distributions, sponsorships, etc. University institutional support and student fee allocations are <strong>not included</strong> and would significantly close the gap.</p>
+  </div>
+  <div class="card">
+    <h2>Year-over-Year % Change</h2>
+    <canvas id="yoyChart" height="260"></canvas>
+  </div>
+</div>
+
+<!-- NCAA Rev Share Explainer -->
+<div class="card" style="margin-bottom:28px;">
+  <h2>NCAA Revenue Share &mdash; How It Works</h2>
+  <div class="explainer-grid">
+    <div class="explainer-item incoming">
+      <div class="explainer-badge">Incoming &#36;</div>
+      <div class="explainer-title">NCAA &amp; Conference Distributions</div>
+      <div class="explainer-body">The NCAA earns ~$1.1B/year from its March Madness TV deal (CBS/Turner). That money is distributed to conferences based on <strong>tournament units</strong> — every game your conference participates in earns a unit worth ~$340K (paid over 6 years). Your conference then distributes this + its own media deal money to member schools. <strong>More tournament appearances and wins = more units = more money flowing to your school.</strong></div>
+      <div class="explainer-stat">Your 2025 total: <span>$1.69M (NCAA) + $1.81M (Conference) = $3.50M</span></div>
+    </div>
+    <div class="explainer-item outgoing">
+      <div class="explainer-badge">Expense &#36;</div>
+      <div class="explainer-title">House Settlement — Direct Athlete Revenue Share</div>
+      <div class="explainer-body">The 2024 <em>House v. NCAA</em> antitrust settlement lets schools <strong>pay athletes directly</strong> from a revenue-sharing pool. The cap starts at ~$20.5M/school/year (growing ~4%/yr through the settlement period). This is separate from NIL deals — it's a direct payment from the school. You're currently spending $4.97M, which is only <strong>24% of your allowable cap</strong>. Schools spending closer to the cap have a major recruiting advantage.</div>
+      <div class="explainer-stat">2025 spend vs cap: <span>$4.97M of $20.5M (24.2%)</span></div>
+      <div class="cap-bar-wrap"><div class="cap-bar" style="width:24.2%; background:var(--accent2);"></div></div>
+    </div>
+    <div class="explainer-item strategy">
+      <div class="explainer-badge">The Strategy</div>
+      <div class="explainer-title">Spending More to Earn More</div>
+      <div class="explainer-body">Increasing rev share spend attracts and retains better athletes → <strong>better win rates</strong> → more ticket sales, bigger donor base, more bowl appearances → more NCAA/conference distribution units. The question your boss needs to answer: <strong>how much additional revenue does each extra dollar of rev share generate?</strong> That's the "Performance Return" slider in the scenario planner below.</div>
+      <div class="explainer-stat">Headroom to invest: <span>~$15.5M/yr above current spend (2025-26 cap)</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Rev Share Investment Planner -->
+<div id="ripPlannerSection" class="card" style="margin-bottom:28px;">
+  <h2>Rev Share Investment Planner</h2>
+
+  <!-- Plain English context -->
+  <div class="rip-context">
+    We currently pay athletes <strong>$4.97M/year</strong> through the House Settlement program (direct payments, separate from scholarships). Our total expenses are <strong>$44.5M</strong> and we self-generate <strong>$13.5M</strong> in athletics revenue &mdash; the rest is covered by the university.
+    <br><br>
+    <strong>The question:</strong> If we increase what we pay athletes, our expenses go up. How much <em>more</em> revenue do we need to bring in to keep our spending balance the same as it is today? Use the slider to find out.
+  </div>
+
+  <!-- Slider -->
+  <div class="rip-slider-wrap">
+    <div class="rip-slider-top">
+      <div>
+        <div class="rip-slider-q">If we increase athlete payments by...</div>
+        <div style="font-size:0.75rem; color:var(--muted); margin-top:3px;">Drag left or right &mdash; the numbers update instantly below</div>
+      </div>
+      <div class="rip-slider-num" id="rc_pct_display">+30%</div>
+    </div>
+    <input type="range" id="rc_slider" min="0" max="312" step="1" value="30"
+      style="width:100%; accent-color:var(--accent); cursor:pointer;"
+      oninput="updateRatioCalc(this.value)">
+    <div class="rip-slider-ticks">
+      <span>No change</span><span>+30%</span><span>+100%</span><span>+200%</span><span>Max allowed (+312%)</span>
+    </div>
+  </div>
+
+  <!-- Hero Answer -->
+  <div class="rip-hero">
+    <div class="rip-hero-label">&#9889; Bottom Line &mdash; At This Investment Level</div>
+    <div class="rip-hero-question" id="rc_hero_q">If we increase athlete pay by +30%...</div>
+    <div class="rip-hero-stats">
+      <div class="rip-stat secondary">
+        <div class="rip-stat-label">Athlete payments go from $4.97M to</div>
+        <div class="rip-stat-value" id="rc_newRS">&mdash;</div>
+      </div>
+      <div class="rip-stat secondary">
+        <div class="rip-stat-label">Our total expenses become</div>
+        <div class="rip-stat-value" id="rc_newExp">&mdash;</div>
+      </div>
+      <div class="rip-stat primary">
+        <div class="rip-stat-label">We need to bring in at least</div>
+        <div class="rip-stat-value" id="rc_reqRev">&mdash;</div>
+      </div>
+      <div class="rip-stat primary">
+        <div class="rip-stat-label">That&apos;s this much more revenue than today</div>
+        <div class="rip-stat-value" id="rc_revDelta">&mdash;</div>
+      </div>
+      <div class="rip-stat highlight">
+        <div class="rip-stat-label">Percentage increase in revenue needed</div>
+        <div class="rip-stat-value" id="rc_revPct">&mdash;</div>
+      </div>
+      <div class="rip-stat neutral">
+        <div class="rip-stat-label">We&apos;d be using this % of the max allowed athlete pay</div>
+        <div class="rip-stat-value" id="rc_capPct">&mdash;</div>
+      </div>
+    </div>
+    <div class="rip-cap-warning" id="rc_capWarning" style="display:none;">
+      &#9888;&nbsp; That increase would exceed the House Settlement maximum ($20.5M). The athlete payment amount is automatically capped at $20.5M in this model.
+    </div>
+  </div>
+
+  <!-- Before / After -->
+  <div class="rip-ba">
+    <div class="rip-ba-card before">
+      <div class="rip-ba-title">Today &mdash; 2025 Baseline</div>
+      <div class="rip-ba-row"><span>Athlete payments (rev share)</span><span>$4,970,000</span></div>
+      <div class="rip-ba-row"><span>All other expenses</span><span>$39,530,000</span></div>
+      <div class="rip-ba-row"><span>Total expenses</span><span style="font-weight:700;">$44,500,000</span></div>
+      <div class="rip-ba-row"><span>Self-generated revenue</span><span>$13,481,528</span></div>
+      <div class="rip-ba-row"><span>Revenue covers</span><span>30.3% of expenses</span></div>
+      <div class="rip-ba-row"><span>Athlete pay as % of allowed max</span><span>24.2% of $20.5M cap</span></div>
+    </div>
+    <div class="rip-ba-card after">
+      <div class="rip-ba-title">After Increase &mdash; Projected</div>
+      <div class="rip-ba-row"><span>Athlete payments (rev share)</span><span id="ba_newRS">&mdash;</span></div>
+      <div class="rip-ba-row"><span>All other expenses</span><span>$39,530,000 (unchanged)</span></div>
+      <div class="rip-ba-row"><span>Total expenses</span><span id="ba_newExp" style="font-weight:700;">&mdash;</span></div>
+      <div class="rip-ba-row" style="background:rgba(67,233,123,0.07);padding:6px 8px;border-radius:5px;"><span style="font-weight:600;color:var(--text)">Revenue needed to stay balanced</span><span id="ba_reqRev" style="color:var(--accent3);font-weight:700;">&mdash;</span></div>
+      <div class="rip-ba-row"><span>Revenue still covers</span><span>30.3% of expenses &#10003;</span></div>
+      <div class="rip-ba-row"><span>Athlete pay as % of allowed max</span><span id="ba_capPct">&mdash;</span></div>
+    </div>
+  </div>
+
+  <!-- Scenario Comparison Table -->
+  <div class="rip-table-label">Scenario Comparison &mdash; What different investment levels would require</div>
+  <div style="font-size:0.78rem; color:var(--muted); margin-bottom:10px;">The highlighted row matches your slider. Green = modest ask, yellow = stretch goal, red = very ambitious.</div>
+  <div class="scenario-tbl-wrap">
+    <table class="scenario-tbl" id="scenarioTable"></table>
+  </div>
+</div>
+
+<!-- Scenario Planner -->
+<div id="scenarioPlannerSection" class="card" style="margin-bottom:28px;">
+  <h2>3-Year Scenario Planner &mdash; Adjust Growth Rate Assumptions</h2>
+  <div class="scenario-grid" id="sliders"></div>
+  <canvas id="scenarioChart" height="200"></canvas>
+  <p class="note"><strong>Revenue shown = athletics-generated revenue only</strong> (does not include university institutional support or student fee allocations). Rev Share growth is automatically capped at the House Settlement limit (~$20.5M in 2025-26, +4%/yr). Actual return on rev share investment depends on recruiting outcomes, sport performance, and donor response — ask your boss for historical performance data to calibrate the "Performance Return" slider.</p>
+</div>
+
+<!-- Forecast Table + Revenue Breakdown -->
+<div id="tablesSection" class="grid-2">
+  <div class="card">
+    <h2>Forecast Detail Table</h2>
+    <div style="font-size:0.78rem; color:var(--muted); margin-bottom:10px;">Purple columns = where the historical trend alone takes us (OLS regression). White columns = after applying your scenario slider assumptions on top.</div>
+    <table class="forecast-table" id="forecastTable"></table>
+  </div>
+  <div class="card">
+    <h2>Revenue Mix (Latest Year: 2025)</h2>
+    <canvas id="revMixChart" height="280"></canvas>
+  </div>
+</div>
+
+<!-- Expense Breakdown -->
+<div id="breakdownSection" style="margin-top:20px;" class="card">
+  <h2>Top Expense Categories (2024 Actuals)</h2>
+  <div style="display:grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap:8px 32px;" id="expBreakdown"></div>
+</div>
+
+<script>
+// ─── RAW DATA ─────────────────────────────────────────────────────────────────
+const years = [2022, 2023, 2024, 2025];
+const forecastYears = [2026, 2027, 2028];
+const allYears = [...years, ...forecastYears];
+
+const costs = {
+  2022: 42279433,
+  2023: 44622483,
+  2024: 43337703,
+  2025: 44500000,
+};
+
+// Revenue (tracked sources only)
+const revenue = {
+  2022: 1933429 + 1308000 + 3714483 + 1436387 + 1909530 + 1994771 + 51645 + 513951 + 183861,
+  2023: 1879898 + 1850000 + 3655911 + 1168851 + 1979755 + 2221033 + 51259 + 562614 + 191910,
+  2024: 1558994 + 1635000 + 3736402 + 1333165 + 1918529 + 2346574 + 67216 + 552246 + 176400,
+  2025: 1916406 + 1995000 + 3639295 + 1677850 + 1694356 + 1806782 + 77273 + 473723 + 200843,
+};
+
+const revMix2025 = {
+  'Ticket Sales': 1916406,
+  'Guarantees': 1995000,
+  'Fundraising': 3639295,
+  'Media Rights': 1677850,
+  'NCAA Distributions': 1694356,
+  'Conference Distributions': 1806782,
+  'Concessions/Novelty': 77273,
+  'Sponsorships/Royalties': 473723,
+  'Endowment & Investments': 200843,
+};
+
+// House Settlement constants
+const NIL_BASE = 4970000;           // 2025 rev share spend
+const HOUSE_CAP_2025 = 20500000;    // 2025-26 cap (~$20.5M)
+const HOUSE_CAP_GROWTH = 0.04;      // ~4%/yr per settlement terms
+const houseCap = (yr) => HOUSE_CAP_2025 * Math.pow(1 + HOUSE_CAP_GROWTH, yr - 2025);
+
+const topExpenses2024 = [
+  { name: 'Admin Salaries', value: 5100000 },
+  { name: 'Head Coaches', value: 3730000 },
+  { name: 'Student Aid', value: 10370000 },
+  { name: 'Total Coaches (pkg)', value: 9140000 },
+  { name: 'Travel', value: 2190000 },
+  { name: 'Other / Alston Benefits', value: 2210000 },
+  { name: 'Recruiting', value: 780377 },
+  { name: 'Marketing', value: 725293 },
+  { name: 'Equipment', value: 2290000 },
+  { name: 'NIL Revenue Share', value: 4970000 },
+];
+
+// ─── SCENARIO STATE ────────────────────────────────────────────────────────────
+const scenario = {
+  expGrowth: 5,         // % annual expense increase
+  revGrowth: 4,         // % annual revenue growth (base)
+  expRevLeverage: 0.8,  // for every 1% expense increase, revenue grows this × %
+  revShareGrowth: 20,   // % annual increase in rev share athlete payments
+  revShareReturn: 0.5,  // $ of additional athletics revenue per $ of incremental rev share
+};
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+const fmt = v => '$' + (v >= 1e6 ? (v/1e6).toFixed(2) + 'M' : v.toLocaleString());
+const pct = v => (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%';
+const chartColor = (hex, alpha) => hex + Math.round(alpha * 255).toString(16).padStart(2,'0');
+
+function linearForecast(data, futureYears) {
+  const xs = Object.keys(data).map(Number);
+  const ys = Object.values(data);
+  const n = xs.length;
+  const mx = xs.reduce((a,b)=>a+b)/n;
+  const my = ys.reduce((a,b)=>a+b)/n;
+  const slope = xs.reduce((s,x,i)=>s+(x-mx)*(ys[i]-my),0) / xs.reduce((s,x)=>s+(x-mx)**2,0);
+  const intercept = my - slope * mx;
+  return futureYears.map(y => Math.max(0, slope * y + intercept));
+}
+
+// OLS trend baseline — computed once, not influenced by sliders
+const olsExpForecast = linearForecast(costs, forecastYears);
+const olsRevForecast = linearForecast(revenue, forecastYears);
+
+function scenarioForecast() {
+  // Start from OLS trend baseline, then layer slider adjustments on top
+  const eg = scenario.expGrowth / 100;
+  const rg = scenario.revGrowth / 100;
+  const lev = scenario.expRevLeverage;
+  const rsGrowth = scenario.revShareGrowth / 100;
+  const rsReturn = scenario.revShareReturn;
+
+  return forecastYears.map((yr, i) => {
+    // OLS baseline (statistical trend from 4 years of actuals)
+    const trendExp = olsExpForecast[i];
+    const trendRev = olsRevForecast[i];
+
+    // Scenario adjustment: slider % applied on top of OLS trend
+    const exp = trendExp * (1 + eg * (i + 1) / 3);  // spread slider effect gradually
+    const revBoost = Math.max(0, eg) * lev;
+    const nilProjected = Math.min(NIL_BASE * Math.pow(1 + rsGrowth, i + 1), houseCap(yr));
+    const nilIncrement = Math.max(0, nilProjected - NIL_BASE);
+    const revShareRevBoost = nilIncrement * rsReturn;
+    const rev = trendRev * (1 + (rg + revBoost) * (i + 1) / 3) + revShareRevBoost;
+    return { yr, exp, rev, trendExp, trendRev, nilProjected, nilIncrement };
+  });
+}
+
+// ─── KPI CARDS ────────────────────────────────────────────────────────────────
+function renderKPIs() {
+  const costGrowth = (costs[2025] - costs[2022]) / costs[2022];
+  const revGrowth = (revenue[2025] - revenue[2022]) / revenue[2022];
+  const costYoy = (costs[2025] - costs[2024]) / costs[2024];
+  const revYoy = (revenue[2025] - revenue[2024]) / revenue[2024];
+  const sf = scenarioForecast();
+  const proj2028Exp = sf[2].exp;
+  const proj2028Rev = sf[2].rev;
+
+  const proj2028Nil = Math.min(NIL_BASE * Math.pow(1 + scenario.revShareGrowth/100, 3), houseCap(2028));
+  const capUtil2025 = (NIL_BASE / HOUSE_CAP_2025 * 100).toFixed(1);
+  const capUtil2028 = (proj2028Nil / houseCap(2028) * 100).toFixed(1);
+
+  const kpis = [
+    { label: '2025 Total Expenses', value: fmt(costs[2025]), delta: pct(costYoy) + ' vs 2024', cls: costYoy >= 0 ? 'up' : 'down' },
+    { label: '2025 Athletics Revenue', value: fmt(revenue[2025]), delta: pct(revYoy) + ' vs 2024 · excl. univ. support', cls: revYoy >= 0 ? 'up' : 'down' },
+    { label: '3-Yr Expense CAGR', value: pct(costGrowth/3), delta: '2022 → 2025', cls: 'neutral' },
+    { label: '3-Yr Revenue CAGR', value: pct(revGrowth/3), delta: '2022 → 2025', cls: revGrowth >= 0 ? 'up' : 'down' },
+    { label: '2028 Proj. Expenses', value: fmt(proj2028Exp), delta: 'Scenario forecast', cls: 'neutral' },
+    { label: '2028 Proj. Revenue', value: fmt(proj2028Rev), delta: 'Scenario forecast', cls: 'up' },
+    { label: 'Rev Share Spend (2025)', value: fmt(NIL_BASE), delta: capUtil2025 + '% of $20.5M cap', cls: 'neutral' },
+    { label: '2028 Proj. Rev Share', value: fmt(proj2028Nil), delta: capUtil2028 + '% of ' + fmt(houseCap(2028)) + ' cap', cls: proj2028Nil >= houseCap(2028) * 0.9 ? 'down' : 'up' },
+  ];
+
+  document.getElementById('kpiRow').innerHTML = kpis.map(k => `
+    <div class="kpi">
+      <label>${k.label}</label>
+      <div class="value">${k.value}</div>
+      <div class="delta ${k.cls}">${k.delta}</div>
+    </div>
+  `).join('');
+}
+
+// ─── CHART: OVERVIEW ─────────────────────────────────────────────────────────
+let overviewChart, yoyChart, scenarioChart, revMixChart;
+
+function buildOverviewChart() {
+  const sf = scenarioForecast();
+  const expData = years.map(y => costs[y]);
+  const expForecast = sf.map(r => r.exp);
+  const revData = years.map(y => revenue[y]);
+  const revForecast = sf.map(r => r.rev);
+  // OLS trend lines (pure statistical extrapolation)
+  const trendExpLine = [...years.map(() => null), ...olsExpForecast];
+  const trendRevLine = [...years.map(() => null), ...olsRevForecast];
+
+  overviewChart = new Chart(document.getElementById('overviewChart'), {
+    type: 'bar',
+    data: {
+      labels: allYears.map(y => y === 2025 ? '2025*' : String(y)),
+      datasets: [
+        {
+          label: 'Expenses (Actual)',
+          data: [...expData, null, null, null, null],
+          backgroundColor: chartColor('#4f7cff', 0.7),
+          order: 2,
+        },
+        {
+          label: 'Expenses (Scenario)',
+          data: [null, null, null, expData[3], ...expForecast],
+          backgroundColor: chartColor('#4f7cff', 0.3),
+          borderColor: '#4f7cff',
+          borderWidth: 1,
+          borderDash: [4,4],
+          order: 3,
+        },
+        {
+          label: 'Athletics Revenue (Actual)',
+          data: [...revData, null, null, null, null],
+          backgroundColor: chartColor('#43e97b', 0.7),
+          order: 2,
+        },
+        {
+          label: 'Athletics Revenue (Scenario)',
+          data: [null, null, null, revData[3], ...revForecast],
+          backgroundColor: chartColor('#43e97b', 0.3),
+          borderColor: '#43e97b',
+          borderWidth: 1,
+          order: 3,
+        },
+        {
+          label: 'Expense Trend (OLS)',
+          type: 'line',
+          data: trendExpLine,
+          borderColor: '#a78bfa',
+          borderDash: [6, 3],
+          borderWidth: 2,
+          pointRadius: 4,
+          pointStyle: 'triangle',
+          fill: false,
+          order: 1,
+        },
+        {
+          label: 'Revenue Trend (OLS)',
+          type: 'line',
+          data: trendRevLine,
+          borderColor: '#a78bfa',
+          borderDash: [2, 2],
+          borderWidth: 2,
+          pointRadius: 4,
+          pointStyle: 'circle',
+          fill: false,
+          order: 1,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#aab2cc', boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#8892b0' }, grid: { color: '#2e3250' } },
+        y: {
+          ticks: { color: '#8892b0', callback: v => '$' + (v/1e6).toFixed(0) + 'M' },
+          grid: { color: '#2e3250' }
+        }
+      }
+    }
+  });
+}
+
+function buildYoyChart() {
+  const expYoy = years.slice(1).map((y, i) => ((costs[y] - costs[years[i]]) / costs[years[i]]) * 100);
+  const revYoy = years.slice(1).map((y, i) => ((revenue[y] - revenue[years[i]]) / revenue[years[i]]) * 100);
+
+  yoyChart = new Chart(document.getElementById('yoyChart'), {
+    type: 'line',
+    data: {
+      labels: years.slice(1).map(String),
+      datasets: [
+        {
+          label: 'Expenses YoY %',
+          data: expYoy,
+          borderColor: '#4f7cff',
+          backgroundColor: chartColor('#4f7cff', 0.1),
+          tension: 0.3,
+          pointRadius: 5,
+          fill: true,
+        },
+        {
+          label: 'Revenue YoY %',
+          data: revYoy,
+          borderColor: '#43e97b',
+          backgroundColor: chartColor('#43e97b', 0.1),
+          tension: 0.3,
+          pointRadius: 5,
+          fill: true,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#aab2cc', boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#8892b0' }, grid: { color: '#2e3250' } },
+        y: {
+          ticks: { color: '#8892b0', callback: v => v.toFixed(1) + '%' },
+          grid: { color: '#2e3250' }
+        }
+      }
+    }
+  });
+}
+
+// ─── CHART: SCENARIO ─────────────────────────────────────────────────────────
+function buildScenarioChart() {
+  const sf = scenarioForecast();
+  const allExp = [...years.map(y => costs[y]), ...sf.map(r => r.exp)];
+  const allRev = [...years.map(y => revenue[y]), ...sf.map(r => r.rev)];
+  // Rev share line: 2025 is the only known actual; rest are scenario projections
+  const allNil = [null, null, null, NIL_BASE, ...sf.map(r => r.nilProjected)];
+  // House cap dashed line (forecast years only)
+  const capLine = [...years.map(() => null), ...forecastYears.map(yr => houseCap(yr))];
+
+  if (scenarioChart) {
+    scenarioChart.data.datasets[0].data = allExp;
+    scenarioChart.data.datasets[1].data = allRev;
+    scenarioChart.data.datasets[2].data = allNil;
+    scenarioChart.data.datasets[3].data = capLine;
+    scenarioChart.update();
+  } else {
+    scenarioChart = new Chart(document.getElementById('scenarioChart'), {
+      type: 'line',
+      data: {
+        labels: allYears.map(y => String(y)),
+        datasets: [
+          {
+            label: 'Total Expenses',
+            data: allExp,
+            borderColor: '#4f7cff',
+            backgroundColor: chartColor('#4f7cff', 0.08),
+            tension: 0.3,
+            pointRadius: (ctx) => ctx.dataIndex >= years.length ? 6 : 4,
+            fill: true,
+          },
+          {
+            label: 'Athletics Revenue',
+            data: allRev,
+            borderColor: '#43e97b',
+            backgroundColor: chartColor('#43e97b', 0.08),
+            tension: 0.3,
+            pointRadius: (ctx) => ctx.dataIndex >= years.length ? 6 : 4,
+            fill: true,
+          },
+          {
+            label: 'Rev Share Spend (NIL)',
+            data: allNil,
+            borderColor: '#f6c90e',
+            backgroundColor: chartColor('#f6c90e', 0.08),
+            borderWidth: 2,
+            tension: 0.3,
+            pointRadius: (ctx) => ctx.dataIndex >= years.length ? 6 : 5,
+            fill: false,
+            yAxisID: 'y2',
+          },
+          {
+            label: 'House Settlement Cap',
+            data: capLine,
+            borderColor: '#ff6b6b',
+            borderDash: [6, 4],
+            borderWidth: 1.5,
+            tension: 0,
+            pointRadius: 0,
+            fill: false,
+            yAxisID: 'y2',
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: '#aab2cc', boxWidth: 12, font: { size: 11 } } },
+        },
+        scales: {
+          x: { ticks: { color: '#8892b0' }, grid: { color: '#2e3250' } },
+          y: {
+            position: 'left',
+            ticks: { color: '#8892b0', callback: v => '$' + (v/1e6).toFixed(1) + 'M' },
+            grid: { color: '#2e3250' }
+          },
+          y2: {
+            position: 'right',
+            ticks: { color: '#8892b0', callback: v => '$' + (v/1e6).toFixed(1) + 'M' },
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'Rev Share / Cap', color: '#8892b0', font: { size: 10 } }
+          }
+        }
+      }
+    });
+  }
+}
+
+// ─── SLIDERS ─────────────────────────────────────────────────────────────────
+function buildSliders() {
+  const sliderDefs = [
+    { key: 'expGrowth', label: 'Annual Expense Growth', min: 0, max: 20, step: 0.5, unit: '%', hint: 'Planned % increase in total expenses per year (includes all categories)' },
+    { key: 'revGrowth', label: 'Base Revenue Growth', min: 0, max: 20, step: 0.5, unit: '%', hint: 'Expected annual growth from existing revenue streams (tickets, donations, media, etc.)' },
+    { key: 'expRevLeverage', label: 'General Expense Leverage', min: 0, max: 2, step: 0.05, unit: 'x', hint: 'Extra revenue generated per 1% of general expense growth (facilities, staff, travel, etc.)' },
+    { key: 'revShareGrowth', label: 'Rev Share Annual Growth', min: 0, max: 50, step: 1, unit: '%', hint: 'Annual % increase in direct athlete payments (House Settlement — capped at ~$20.5M in 2025-26, growing ~4%/yr). Capped automatically.' },
+    { key: 'revShareReturn', label: 'Rev Share Performance Return', min: 0, max: 3, step: 0.1, unit: 'x', hint: 'Additional athletics revenue per $1 of incremental rev share investment — via better recruiting, performance, ticket/donor growth, and more NCAA tournament units.' },
+  ];
+
+  document.getElementById('sliders').innerHTML = sliderDefs.map(s => `
+    <div class="slider-group card" style="padding:16px;">
+      <label>${s.label} <span id="val_${s.key}">${scenario[s.key]}${s.unit}</span></label>
+      <input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${scenario[s.key]}"
+        id="sl_${s.key}" oninput="updateScenario('${s.key}', this.value, '${s.unit}')">
+      <div style="font-size:0.72rem; color:var(--muted); margin-top:6px;">${s.hint}</div>
+    </div>
+  `).join('');
+}
+
+function updateScenario(key, val, unit) {
+  scenario[key] = parseFloat(val);
+  document.getElementById(`val_${key}`).textContent = parseFloat(val).toFixed(unit === 'x' ? 2 : 1) + unit;
+  buildScenarioChart();
+  renderForecastTable();
+  renderKPIs();
+  overviewChart.destroy();
+  buildOverviewChart();
+}
+
+// ─── FORECAST TABLE ───────────────────────────────────────────────────────────
+function renderForecastTable() {
+  const sf = scenarioForecast();
+  const allRows = [
+    ...years.map((y, i) => ({ yr: y, exp: costs[y], rev: revenue[y], isForecast: false,
+      expChg: i === 0 ? null : (costs[y] - costs[years[i-1]])/costs[years[i-1]],
+      revChg: i === 0 ? null : (revenue[y] - revenue[years[i-1]])/revenue[years[i-1]],
+      trendExp: null, trendRev: null,
+    })),
+    ...sf.map((r, i) => ({
+      yr: r.yr, exp: r.exp, rev: r.rev, isForecast: true,
+      trendExp: r.trendExp, trendRev: r.trendRev,
+      expChg: i === 0 ? (r.exp - costs[2025])/costs[2025] : (r.exp - sf[i-1].exp)/sf[i-1].exp,
+      revChg: i === 0 ? (r.rev - revenue[2025])/revenue[2025] : (r.rev - sf[i-1].rev)/sf[i-1].rev,
+    }))
+  ];
+
+  const html = `
+    <thead><tr>
+      <th>Year</th>
+      <th class="trend-hdr">Trend Exp.</th>
+      <th class="trend-hdr">Trend Rev.</th>
+      <th>Scenario Exp.</th><th>Exp Δ</th>
+      <th>Scenario Rev.*</th><th>Rev Δ</th>
+    </tr></thead>
+    <tbody>
+      ${allRows.map(r => `
+        <tr class="${r.isForecast ? 'forecast-row' : ''}">
+          <td>${r.yr}${r.yr === 2025 && !r.isForecast ? '*' : ''}</td>
+          <td class="trend-col">${r.trendExp !== null ? fmt(r.trendExp) : '—'}</td>
+          <td class="trend-col">${r.trendRev !== null ? fmt(r.trendRev) : '—'}</td>
+          <td>${fmt(r.exp)}</td>
+          <td>${r.expChg === null ? '—' : `<span class="tag ${r.expChg >= 0 ? 'up' : 'down'}">${pct(r.expChg)}</span>`}</td>
+          <td>${fmt(r.rev)}</td>
+          <td>${r.revChg === null ? '—' : `<span class="tag ${r.isForecast ? 'forecast' : r.revChg >= 0 ? 'up' : 'down'}">${pct(r.revChg)}</span>`}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  `;
+  document.getElementById('forecastTable').innerHTML = html;
+}
+
+// ─── REVENUE MIX DOUGHNUT ────────────────────────────────────────────────────
+function buildRevMixChart() {
+  const labels = Object.keys(revMix2025);
+  const data = Object.values(revMix2025);
+  const colors = ['#4f7cff','#43e97b','#ff6b6b','#f6c90e','#a78bfa','#38bdf8','#fb923c','#e879f9','#34d399'];
+
+  revMixChart = new Chart(document.getElementById('revMixChart'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#1c1f2e' }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#aab2cc', boxWidth: 10, font: { size: 11 }, padding: 8 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)} (${(ctx.raw/Object.values(revMix2025).reduce((a,b)=>a+b)*100).toFixed(1)}%)` } }
+      }
+    }
+  });
+}
+
+// ─── EXPENSE BREAKDOWN BARS ───────────────────────────────────────────────────
+function renderExpBreakdown() {
+  const max = Math.max(...topExpenses2024.map(e => e.value));
+  document.getElementById('expBreakdown').innerHTML = topExpenses2024.map(e => `
+    <div>
+      <div class="exp-row">
+        <span>${e.name}</span>
+        <span style="font-weight:600; color:var(--accent)">${fmt(e.value)}</span>
+      </div>
+      <div class="exp-bar" style="width:${(e.value/max*100).toFixed(1)}%"></div>
+    </div>
+  `).join('');
+}
+
+// ─── REV SHARE INVESTMENT PLANNER ────────────────────────────────────────────
+const RC = {
+  baseRS:    4970000,
+  nonRS:     39530000,
+  baseExp:   44500000,
+  baseRev:   13481528,
+  baseRatio: 44500000 / 13481528,  // 3.300813
+  cap:       20500000,
+};
+
+// Scenario rows: plain-English labels for higher-ups
+const SCENARIO_ROWS = [
+  { pct:  0, label: 'No change — keep as-is' },
+  { pct: 10, label: '+10% — modest bump' },
+  { pct: 20, label: '+20% — moderate increase' },
+  { pct: 30, label: "+30% — Boss's target \u2B50" },
+  { pct: 40, label: '+40% — meaningful push' },
+  { pct: 50, label: '+50% — halfway to doubling' },
+  { pct: 75, label: '+75% — significant investment' },
+  { pct: 100, label: '+100% — double the payments' },
+  { pct: 150, label: '+150% — 2.5x current level' },
+  { pct: 200, label: '+200% — 3x (near max)' },
+  { pct: 312, label: '+312% — maximum allowed by NCAA' },
+];
+
+function calcRC(pctIncrease) {
+  const rawRS    = RC.baseRS * (1 + pctIncrease / 100);
+  const capped   = rawRS > RC.cap;
+  const newRS    = Math.min(rawRS, RC.cap);
+  const newExp   = RC.nonRS + newRS;
+  const reqRev   = newExp / RC.baseRatio;
+  const revExtra = reqRev - RC.baseRev;
+  const revPct   = (reqRev / RC.baseRev - 1) * 100;
+  const capPct   = (newRS / RC.cap) * 100;
+  return { newRS, capped, newExp, reqRev, revExtra, revPct, capPct };
+}
+
+function fmtD(v) {
+  return '$' + (v / 1e6).toFixed(2) + 'M';
+}
+function fmtExtra(v) {
+  if (v < 1000) return '+$' + Math.round(v).toLocaleString();
+  if (v < 1e6)  return '+$' + Math.round(v / 1000).toFixed(0) + 'K';
+  return '+$' + (v / 1e6).toFixed(2) + 'M';
+}
+function trafficLight(revPct) {
+  if (revPct < 5)  return { color: '#43e97b', label: 'Manageable' };
+  if (revPct < 10) return { color: '#f6c90e', label: 'Stretch goal' };
+  return { color: '#ff6b6b', label: 'Very ambitious' };
+}
+
+function updateRatioCalc(sliderVal) {
+  const pct = parseFloat(sliderVal);
+  const c   = calcRC(pct);
+  const tl  = trafficLight(c.revPct);
+
+  // Slider display
+  document.getElementById('rc_pct_display').textContent = '+' + pct + '%' + (c.capped ? ' (at max)' : '');
+
+  // Hero callout
+  document.getElementById('rc_hero_q').textContent =
+    'If we increase athlete pay by +' + pct + '%' + (c.capped ? ' (capped at NCAA max)' : '') + '...';
+  document.getElementById('rc_newRS').textContent  = fmtD(c.newRS);
+  document.getElementById('rc_newExp').textContent = fmtD(c.newExp);
+  document.getElementById('rc_reqRev').textContent = fmtD(c.reqRev);
+  document.getElementById('rc_revDelta').textContent = fmtExtra(c.revExtra);
+  document.getElementById('rc_revPct').textContent  = '+' + c.revPct.toFixed(1) + '%';
+  document.getElementById('rc_capPct').textContent  = c.capPct.toFixed(0) + '% of the $20.5M limit';
+  document.getElementById('rc_capWarning').style.display = c.capped ? 'block' : 'none';
+
+  // Before / After cards
+  document.getElementById('ba_newRS').textContent  = fmtD(c.newRS);
+  document.getElementById('ba_newExp').textContent = fmtD(c.newExp);
+  document.getElementById('ba_reqRev').textContent = fmtD(c.reqRev);
+  document.getElementById('ba_capPct').textContent = c.capPct.toFixed(0) + '% of $20.5M cap';
+
+  // Highlight active row in scenario table
+  document.querySelectorAll('.scenario-tbl tr[data-pct]').forEach(row => {
+    const rp = parseInt(row.dataset.pct);
+    const match = (rp === Math.round(pct)) || (pct >= 305 && rp === 312);
+    row.classList.toggle('active-row', match);
+  });
+}
+
+function buildScenarioTable() {
+  const hdr = `<thead><tr>
+    <th>Scenario</th>
+    <th>Athlete Payments</th>
+    <th>Total Expenses</th>
+    <th>Revenue Needed</th>
+    <th>Extra Revenue Required</th>
+    <th>Revenue % Increase</th>
+    <th>Difficulty</th>
+  </tr></thead>`;
+
+  const rows = SCENARIO_ROWS.map(({ pct, label }) => {
+    const c  = calcRC(pct);
+    const tl = trafficLight(c.revPct);
+    const capNote = c.capped ? ' <span style="font-size:0.7rem;color:var(--accent2)">(at NCAA max)</span>' : '';
+    return `<tr data-pct="${pct}" class="${pct === 30 ? 'active-row' : ''}">
+      <td style="font-weight:600; color:${pct === 30 ? 'var(--accent)' : 'var(--text)'}; white-space:nowrap;">${label}</td>
+      <td>${fmtD(c.newRS)}${capNote}</td>
+      <td>${fmtD(c.newExp)}</td>
+      <td style="color:var(--accent3); font-weight:700;">${fmtD(c.reqRev)}</td>
+      <td style="color:var(--accent3);">${fmtExtra(c.revExtra)}</td>
+      <td style="font-weight:700; color:${tl.color};">+${c.revPct.toFixed(1)}%</td>
+      <td>
+        <span class="traffic-dot" style="background:${tl.color};"></span>
+        <span style="font-size:0.8rem; color:${tl.color}; font-weight:600;">${tl.label}</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('scenarioTable').innerHTML = hdr + '<tbody>' + rows + '</tbody>';
+}
+
+// ─── PDF EXPORT (via browser print) ──────────────────────────────────────────
+function exportPDF() {
+  // Populate cover page stats before printing
+  const sf = scenarioForecast();
+  const c30 = calcRC(30);
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  document.getElementById('printCoverDate').textContent = 'Generated: ' + today;
+
+  const rows = [
+    ['2025 Total Expenses', fmt(costs[2025])],
+    ['2025 Athletics Revenue (self-generated)', fmt(revenue[2025])],
+    ['Revenue covers % of expenses', (revenue[2025] / costs[2025] * 100).toFixed(1) + '%'],
+    ['Athlete payments (rev share)', fmt(NIL_BASE) + ' — ' + (NIL_BASE / HOUSE_CAP_2025 * 100).toFixed(1) + '% of $20.5M cap'],
+    ['', ''],
+    ['2028 Projected Expenses — OLS trend', fmt(olsExpForecast[2])],
+    ['2028 Projected Revenue — OLS trend', fmt(olsRevForecast[2])],
+    ['2028 Projected Expenses — with scenario', fmt(sf[2].exp)],
+    ['2028 Projected Revenue — with scenario', fmt(sf[2].rev)],
+    ['', ''],
+    ['At +30% rev share: revenue needed', fmtD(c30.reqRev)],
+    ['At +30% rev share: extra revenue required', fmtExtra(c30.revExtra) + ' (' + c30.revPct.toFixed(1) + '% increase)'],
+  ];
+
+  document.getElementById('printCoverStats').innerHTML = rows.map(([label, val]) =>
+    label === '' ? '<tr><td colspan="2" style="padding:4px 0;"></td></tr>' :
+    `<tr>
+      <td style="padding:6px 12px 6px 0; color:#555e7a; font-size:0.85rem; width:60%; border-bottom:1px solid #e0e4f0;">${label}</td>
+      <td style="padding:6px 0; font-weight:700; font-size:0.9rem; color:#0f1117; border-bottom:1px solid #e0e4f0;">${val}</td>
+    </tr>`
+  ).join('');
+
+  window.print();
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+renderKPIs();
+buildSliders();
+buildOverviewChart();
+buildYoyChart();
+buildScenarioChart();
+buildRevMixChart();
+renderForecastTable();
+renderExpBreakdown();
+buildScenarioTable();
+updateRatioCalc(30);
+</script>
+</body>
+</html>
