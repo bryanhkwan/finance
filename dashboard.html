@@ -187,6 +187,22 @@
     }
     .data-badge.error { background: rgba(255,107,107,0.1); border-color: rgba(255,107,107,0.3); color: var(--accent2); }
 
+    /* Insight cards */
+    .insight-card { background: var(--surface2); border-radius: 10px; padding: 16px 18px; border-left: 4px solid var(--accent); }
+    .insight-card.positive { border-left-color: var(--accent3); }
+    .insight-card.negative { border-left-color: var(--accent2); }
+    .insight-card.neutral  { border-left-color: var(--muted); }
+    .insight-card .insight-icon { font-size: 1.2rem; margin-bottom: 6px; }
+    .insight-card .insight-title { font-size: 0.82rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .insight-card .insight-body { font-size: 0.78rem; color: var(--text-dim); line-height: 1.55; }
+
+    /* Drag-and-drop overlay */
+    .drag-overlay { display:none; position:fixed; inset:0; background:rgba(15,17,23,0.85); z-index:9999; justify-content:center; align-items:center; }
+    .drag-overlay.active { display:flex; }
+    .drag-overlay-inner { text-align:center; padding:48px 64px; border:3px dashed var(--accent); border-radius:20px; background:var(--surface); }
+    .drag-overlay-inner h2 { font-size:1.4rem; color:var(--accent); margin-top:12px; }
+    .drag-overlay-inner p { color:var(--muted); font-size:0.9rem; margin-top:6px; }
+
     /* Export Button */
     .export-btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -227,7 +243,24 @@
       /* Hide interactive / screen-only elements */
       .export-btn, .export-progress,
       .rip-slider-wrap, .scenario-grid,
-      #sliders, .note { display: none !important; }
+      #sliders, .note, .upload-btn, #uploadPrompt,
+      #dataSourceBadge, .drag-overlay { display: none !important; }
+
+      /* Insight cards */
+      .insight-card { background: #eef0f8 !important; border-left: 4px solid #1a56db !important; break-inside: avoid; }
+      .insight-card.positive { border-left-color: #157a3f !important; }
+      .insight-card.negative { border-left-color: #c0392b !important; }
+      .insight-card .insight-title { color: #0f1117 !important; }
+      .insight-card .insight-body { color: #3a4060 !important; }
+
+      /* Page footer with branding */
+      @page { margin: 0.7in 0.6in 0.9in 0.6in; }
+      body::after {
+        content: 'UNI Athletics Financial Dashboard  \u00b7  Confidential';
+        position: fixed; bottom: 0; left: 0; right: 0;
+        text-align: center; font-size: 8pt; color: #999;
+        padding: 6px 0; border-top: 1px solid #e0e4f0;
+      }
 
       /* Show print cover */
       .print-cover { display: block !important; page-break-after: always; }
@@ -334,7 +367,7 @@
     <div style="font-size:0.65rem; text-transform:uppercase; letter-spacing:0.15em; color:#555e7a; margin-bottom:8px;">Confidential &mdash; Internal Use Only</div>
     <h1 style="font-size:2.2rem; font-weight:800; color:#0f1117; margin-bottom:6px;">UNI Athletics</h1>
     <h2 style="font-size:1.5rem; font-weight:600; color:#1a56db; margin-bottom:12px;">Financial Analysis Report</h2>
-    <div style="font-size:0.95rem; color:#555e7a;">Expense &amp; Revenue Forecast &nbsp;&middot;&nbsp; 2022&ndash;2028 &nbsp;&middot;&nbsp; Based on 2025-26 Budget Data</div>
+    <div id="printCoverSubtitle" style="font-size:0.95rem; color:#555e7a;">Expense &amp; Revenue Forecast</div>
   </div>
 
   <div style="margin-bottom:28px;">
@@ -344,38 +377,61 @@
     </table>
   </div>
 
-  <div style="margin-top:32px; padding-top:16px; border-top:1px solid #d0d4e8; font-size:0.75rem; color:#888;">
-    <span id="printCoverDate"></span> &nbsp;&nbsp;&middot;&nbsp;&nbsp; Forecasting method: OLS linear regression (2022&ndash;2025 actuals)
+  <div id="printKeyInsights" style="margin-bottom:24px;"></div>
+
+  <div style="margin-top:32px; padding-top:16px; border-top:1px solid #d0d4e8; font-size:0.75rem; color:#888; display:flex; justify-content:space-between;">
+    <span id="printCoverDate"></span>
+    <span id="printCoverMethod">Forecasting method: OLS linear regression</span>
   </div>
 </div>
 
 <header>
   <div>
     <h1>UNI Athletics &mdash; Financial Dashboard</h1>
-    <div style="margin-top:4px; font-size:0.8rem; color:var(--muted);">Expense &amp; Revenue Forecast · 2022–2028</div>
+    <div id="subtitleText" style="margin-top:4px; font-size:0.8rem; color:var(--muted);">Upload an Excel file to get started</div>
   </div>
   <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
     <span id="dataSourceBadge" class="data-badge" style="display:none;"></span>
-    <label class="upload-btn" for="xlsxUpload" title="Load data from your Excel file — replaces the hardcoded numbers instantly">
+    <label class="upload-btn" for="xlsxUpload" title="Upload your UNI EXPENSES .xlsx file to populate the dashboard">
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5V9h4.5L13 3.5zM8 17l4-4 4 4h-3v3h-2v-3H8zm0-8h8v1.5H8V9z"/></svg>
       Update Data
     </label>
     <input type="file" id="xlsxUpload" accept=".xlsx,.xls" style="display:none;">
   </div>
   <div style="display:flex; align-items:center; gap:12px;">
-    <span>Last updated: 2025-26 Budget</span>
-    <button class="export-btn" onclick="window.print()" id="exportBtn">
+    <span id="lastUpdatedSpan">No data loaded</span>
+    <button class="export-btn" onclick="exportPDF()" id="exportBtn" disabled title="Upload data first">
       <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 18h-2v-4H8l4-4 4 4h-3v4zm1-10V3.5L18.5 8H14z"/></svg>
       Export PDF Report
     </button>
   </div>
 </header>
 
+<!-- Drag-and-drop overlay -->
+<div class="drag-overlay" id="dragOverlay">
+  <div class="drag-overlay-inner">
+    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+    <h2>Drop your Excel file here</h2>
+    <p>Supports .xlsx and .xls files</p>
+  </div>
+</div>
+
+<!-- Upload Prompt (shown until data loaded) -->
+<div id="uploadPrompt" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px;">
+  <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+  <h2 style="margin-top:18px;font-size:1.5rem;color:var(--fg);">Upload Your Data</h2>
+  <p style="color:var(--muted);max-width:440px;line-height:1.6;">Click <strong>Update Data</strong> in the header (or drag your <code>.xlsx</code> file) to load <strong>UNI EXPENSES.xlsx</strong>. The dashboard will build automatically from the Cost and Revenue sheets.</p>
+  <label for="xlsxUpload" class="upload-btn" style="margin-top:20px;font-size:1rem;padding:10px 28px;cursor:pointer;">
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5V9h4.5L13 3.5zM8 17l4-4 4 4h-3v3h-2v-3H8zm0-8h8v1.5H8V9z"/></svg>
+    Choose File
+  </label>
+</div>
+
 <!-- KPI Cards -->
-<div class="kpi-row" id="kpiRow"></div>
+<div class="kpi-row dashboard-content" id="kpiRow" style="display:none;"></div>
 
 <!-- Main Charts -->
-<div class="grid-2">
+<div class="grid-2 dashboard-content" style="display:none;">
   <div class="card">
     <h2>Total Expenses vs Athletics-Generated Revenue (Actuals + OLS Trend + Scenario)</h2>
     <canvas id="overviewChart" height="260"></canvas>
@@ -388,40 +444,38 @@
 </div>
 
 <!-- NCAA Rev Share Explainer -->
-<div class="card" style="margin-bottom:28px;">
+<div class="card dashboard-content" style="margin-bottom:28px;display:none;">
   <h2>NCAA Revenue Share &mdash; How It Works</h2>
   <div class="explainer-grid">
     <div class="explainer-item incoming">
       <div class="explainer-badge">Incoming &#36;</div>
       <div class="explainer-title">NCAA &amp; Conference Distributions</div>
       <div class="explainer-body">The NCAA earns ~$1.1B/year from its March Madness TV deal (CBS/Turner). That money is distributed to conferences based on <strong>tournament units</strong> — every game your conference participates in earns a unit worth ~$340K (paid over 6 years). Your conference then distributes this + its own media deal money to member schools. <strong>More tournament appearances and wins = more units = more money flowing to your school.</strong></div>
-      <div class="explainer-stat">Your 2025 total: <span>$1.69M (NCAA) + $1.81M (Conference) = $3.50M</span></div>
+      <div class="explainer-stat">Distribution total: <span id="explainerDistStat">Upload data to see</span></div>
     </div>
     <div class="explainer-item outgoing">
       <div class="explainer-badge">Expense &#36;</div>
       <div class="explainer-title">House Settlement — Direct Athlete Revenue Share</div>
-      <div class="explainer-body">The 2024 <em>House v. NCAA</em> antitrust settlement lets schools <strong>pay athletes directly</strong> from a revenue-sharing pool. The cap starts at ~$20.5M/school/year (growing ~4%/yr through the settlement period). This is separate from NIL deals — it's a direct payment from the school. You're currently spending $4.97M, which is only <strong>24% of your allowable cap</strong>. Schools spending closer to the cap have a major recruiting advantage.</div>
-      <div class="explainer-stat">2025 spend vs cap: <span>$4.97M of $20.5M (24.2%)</span></div>
-      <div class="cap-bar-wrap"><div class="cap-bar" style="width:24.2%; background:var(--accent2);"></div></div>
+      <div class="explainer-body">The 2024 <em>House v. NCAA</em> antitrust settlement lets schools <strong>pay athletes directly</strong> from a revenue-sharing pool. The cap starts at ~$20.5M/school/year (growing ~4%/yr through the settlement period). This is separate from NIL deals — it's a direct payment from the school.</div>
+      <div class="explainer-stat">Spend vs cap: <span id="explainerCapStat">Upload data to see</span></div>
+      <div class="cap-bar-wrap"><div class="cap-bar" id="capBarFill" style="width:0%; background:var(--accent2);"></div></div>
     </div>
     <div class="explainer-item strategy">
       <div class="explainer-badge">The Strategy</div>
       <div class="explainer-title">Spending More to Earn More</div>
       <div class="explainer-body">Increasing rev share spend attracts and retains better athletes → <strong>better win rates</strong> → more ticket sales, bigger donor base, more bowl appearances → more NCAA/conference distribution units. The question your boss needs to answer: <strong>how much additional revenue does each extra dollar of rev share generate?</strong> That's the "Performance Return" slider in the scenario planner below.</div>
-      <div class="explainer-stat">Headroom to invest: <span>~$15.5M/yr above current spend (2025-26 cap)</span></div>
+      <div class="explainer-stat">Headroom to invest: <span id="explainerHeadroom">Upload data to see</span></div>
     </div>
   </div>
 </div>
 
 <!-- Rev Share Investment Planner -->
-<div id="ripPlannerSection" class="card" style="margin-bottom:28px;">
+<div id="ripPlannerSection" class="card dashboard-content" style="margin-bottom:28px;display:none;">
   <h2>Rev Share Investment Planner</h2>
 
   <!-- Plain English context -->
-  <div class="rip-context">
-    We currently pay athletes <strong>$4.97M/year</strong> through the House Settlement program (direct payments, separate from scholarships). Our total expenses are <strong>$44.5M</strong> and we self-generate <strong>$13.5M</strong> in athletics revenue &mdash; the rest is covered by the university.
-    <br><br>
-    <strong>The question:</strong> If we increase what we pay athletes, our expenses go up. How much <em>more</em> revenue do we need to bring in to keep our spending balance the same as it is today? Use the slider to find out.
+  <div class="rip-context" id="ripContext">
+    Upload your Excel file to see the investment planner populated with your data.
   </div>
 
   <!-- Slider -->
@@ -447,7 +501,7 @@
     <div class="rip-hero-question" id="rc_hero_q">If we increase athlete pay by +30%...</div>
     <div class="rip-hero-stats">
       <div class="rip-stat secondary">
-        <div class="rip-stat-label">Athlete payments go from $4.97M to</div>
+        <div class="rip-stat-label">Athlete payments go from <span id="rc_fromRS">—</span> to</div>
         <div class="rip-stat-value" id="rc_newRS">&mdash;</div>
       </div>
       <div class="rip-stat secondary">
@@ -479,21 +533,21 @@
   <!-- Before / After -->
   <div class="rip-ba">
     <div class="rip-ba-card before">
-      <div class="rip-ba-title">Today &mdash; 2025 Baseline</div>
-      <div class="rip-ba-row"><span>Athlete payments (rev share)</span><span>$4,970,000</span></div>
-      <div class="rip-ba-row"><span>All other expenses</span><span>$39,530,000</span></div>
-      <div class="rip-ba-row"><span>Total expenses</span><span style="font-weight:700;">$44,500,000</span></div>
-      <div class="rip-ba-row"><span>Self-generated revenue</span><span>$13,481,528</span></div>
-      <div class="rip-ba-row"><span>Revenue covers</span><span>30.3% of expenses</span></div>
-      <div class="rip-ba-row"><span>Athlete pay as % of allowed max</span><span>24.2% of $20.5M cap</span></div>
+      <div class="rip-ba-title">Today &mdash; Baseline</div>
+      <div class="rip-ba-row"><span>Athlete payments (rev share)</span><span id="ba_baseRS">&mdash;</span></div>
+      <div class="rip-ba-row"><span>All other expenses</span><span id="ba_nonRS">&mdash;</span></div>
+      <div class="rip-ba-row"><span>Total expenses</span><span id="ba_baseExp" style="font-weight:700;">&mdash;</span></div>
+      <div class="rip-ba-row"><span>Self-generated revenue</span><span id="ba_baseRev">&mdash;</span></div>
+      <div class="rip-ba-row"><span>Revenue covers</span><span id="ba_baseRatio">&mdash;</span></div>
+      <div class="rip-ba-row"><span>Athlete pay as % of allowed max</span><span id="ba_baseCapPct">&mdash;</span></div>
     </div>
     <div class="rip-ba-card after">
       <div class="rip-ba-title">After Increase &mdash; Projected</div>
       <div class="rip-ba-row"><span>Athlete payments (rev share)</span><span id="ba_newRS">&mdash;</span></div>
-      <div class="rip-ba-row"><span>All other expenses</span><span>$39,530,000 (unchanged)</span></div>
+      <div class="rip-ba-row"><span>All other expenses</span><span id="ba_afterNonRS">&mdash; (unchanged)</span></div>
       <div class="rip-ba-row"><span>Total expenses</span><span id="ba_newExp" style="font-weight:700;">&mdash;</span></div>
       <div class="rip-ba-row" style="background:rgba(67,233,123,0.07);padding:6px 8px;border-radius:5px;"><span style="font-weight:600;color:var(--text)">Revenue needed to stay balanced</span><span id="ba_reqRev" style="color:var(--accent3);font-weight:700;">&mdash;</span></div>
-      <div class="rip-ba-row"><span>Revenue still covers</span><span>30.3% of expenses &#10003;</span></div>
+      <div class="rip-ba-row"><span>Revenue still covers</span><span id="ba_afterRatio">&mdash;</span></div>
       <div class="rip-ba-row"><span>Athlete pay as % of allowed max</span><span id="ba_capPct">&mdash;</span></div>
     </div>
   </div>
@@ -507,7 +561,7 @@
 </div>
 
 <!-- Scenario Planner -->
-<div id="scenarioPlannerSection" class="card" style="margin-bottom:28px;">
+<div id="scenarioPlannerSection" class="card dashboard-content" style="margin-bottom:28px;display:none;">
   <h2>3-Year Scenario Planner &mdash; Adjust Growth Rate Assumptions</h2>
   <div class="scenario-grid" id="sliders"></div>
   <canvas id="scenarioChart" height="200"></canvas>
@@ -515,75 +569,44 @@
 </div>
 
 <!-- Forecast Table + Revenue Breakdown -->
-<div id="tablesSection" class="grid-2">
+<div id="tablesSection" class="grid-2 dashboard-content" style="display:none;">
   <div class="card">
     <h2>Forecast Detail Table</h2>
     <div style="font-size:0.78rem; color:var(--muted); margin-bottom:10px;">Purple columns = where the historical trend alone takes us (OLS regression). White columns = after applying your scenario slider assumptions on top.</div>
     <table class="forecast-table" id="forecastTable"></table>
   </div>
   <div class="card">
-    <h2>Revenue Mix (Latest Year: 2025)</h2>
+    <h2 id="revMixTitle">Revenue Mix</h2>
     <canvas id="revMixChart" height="280"></canvas>
   </div>
 </div>
 
 <!-- Expense Breakdown -->
-<div id="breakdownSection" style="margin-top:20px;" class="card">
+<div id="breakdownSection" style="margin-top:20px;display:none;" class="card dashboard-content">
   <h2>Top Expense Categories (2024 Actuals)</h2>
   <div style="display:grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap:8px 32px;" id="expBreakdown"></div>
 </div>
 
+<!-- Key Insights (auto-generated) -->
+<div id="insightsSection" class="card dashboard-content" style="margin-top:20px;display:none;">
+  <h2>Key Insights &amp; Observations</h2>
+  <div id="insightsList" style="display:grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap:12px;"></div>
+</div>
+
 <script>
-// ─── RAW DATA ─────────────────────────────────────────────────────────────────
-const years = [2022, 2023, 2024, 2025];
-const forecastYears = [2026, 2027, 2028];
-const allYears = [...years, ...forecastYears];
+// ─── DATA (populated from uploaded Excel) ─────────────────────────────────────
+let years = [];
+let forecastYears = [2026, 2027, 2028];  // default; recomputed from data
+let allYears = [];
 
-let costs = {
-  2022: 42279433,
-  2023: 44622483,
-  2024: 43337703,
-  2025: 44500000,
-};
-
-// Revenue (tracked sources only)
-let revenue = {
-  2022: 1933429 + 1308000 + 3714483 + 1436387 + 1909530 + 1994771 + 51645 + 513951 + 183861,
-  2023: 1879898 + 1850000 + 3655911 + 1168851 + 1979755 + 2221033 + 51259 + 562614 + 191910,
-  2024: 1558994 + 1635000 + 3736402 + 1333165 + 1918529 + 2346574 + 67216 + 552246 + 176400,
-  2025: 1916406 + 1995000 + 3639295 + 1677850 + 1694356 + 1806782 + 77273 + 473723 + 200843,
-};
-
-let revMix2025 = {
-  'Ticket Sales': 1916406,
-  'Guarantees': 1995000,
-  'Fundraising': 3639295,
-  'Media Rights': 1677850,
-  'NCAA Distributions': 1694356,
-  'Conference Distributions': 1806782,
-  'Concessions/Novelty': 77273,
-  'Sponsorships/Royalties': 473723,
-  'Endowment & Investments': 200843,
-};
-
-// House Settlement constants
-let NIL_BASE = 4970000;           // 2025 rev share spend (updated from Sheets)
-const HOUSE_CAP_2025 = 20500000;    // 2025-26 cap (~$20.5M)
-const HOUSE_CAP_GROWTH = 0.04;      // ~4%/yr per settlement terms
+let costs = {};
+let revenue = {};
+let revMix2025 = {};
+let NIL_BASE = 0;
+const HOUSE_CAP_2025 = 20500000;
+const HOUSE_CAP_GROWTH = 0.04;
 const houseCap = (yr) => HOUSE_CAP_2025 * Math.pow(1 + HOUSE_CAP_GROWTH, yr - 2025);
-
-let topExpenses2024 = [
-  { name: 'Admin Salaries', value: 5100000 },
-  { name: 'Head Coaches', value: 3730000 },
-  { name: 'Student Aid', value: 10370000 },
-  { name: 'Total Coaches (pkg)', value: 9140000 },
-  { name: 'Travel', value: 2190000 },
-  { name: 'Other / Alston Benefits', value: 2210000 },
-  { name: 'Recruiting', value: 780377 },
-  { name: 'Marketing', value: 725293 },
-  { name: 'Equipment', value: 2290000 },
-  { name: 'NIL Revenue Share', value: 4970000 },
-];
+let topExpenses2024 = [];
 
 // ─── SCENARIO STATE ────────────────────────────────────────────────────────────
 const scenario = {
@@ -640,27 +663,32 @@ function scenarioForecast() {
 
 // ─── KPI CARDS ────────────────────────────────────────────────────────────────
 function renderKPIs() {
-  const costGrowth = (costs[2025] - costs[2022]) / costs[2022];
-  const revGrowth = (revenue[2025] - revenue[2022]) / revenue[2022];
-  const costYoy = (costs[2025] - costs[2024]) / costs[2024];
-  const revYoy = (revenue[2025] - revenue[2024]) / revenue[2024];
-  const sf = scenarioForecast();
-  const proj2028Exp = sf[2].exp;
-  const proj2028Rev = sf[2].rev;
+  const latestYr = Math.max(...years);
+  const oldestYr = Math.min(...years);
+  const prevYr   = years.length >= 2 ? years[years.length - 2] : latestYr;
+  const span     = latestYr - oldestYr || 1;
 
-  const proj2028Nil = Math.min(NIL_BASE * Math.pow(1 + scenario.revShareGrowth/100, 3), houseCap(2028));
+  const costGrowth = costs[oldestYr] ? (costs[latestYr] - costs[oldestYr]) / costs[oldestYr] : 0;
+  const revGrowth  = revenue[oldestYr] ? (revenue[latestYr] - revenue[oldestYr]) / revenue[oldestYr] : 0;
+  const costYoy    = costs[prevYr] ? (costs[latestYr] - costs[prevYr]) / costs[prevYr] : 0;
+  const revYoy     = revenue[prevYr] ? (revenue[latestYr] - revenue[prevYr]) / revenue[prevYr] : 0;
+  const sf = scenarioForecast();
+  const lastFc = sf[sf.length - 1] || { exp: 0, rev: 0 };
+  const lastFcYr = forecastYears[forecastYears.length - 1];
+
+  const proj2028Nil = Math.min(NIL_BASE * Math.pow(1 + scenario.revShareGrowth/100, forecastYears.length), houseCap(lastFcYr));
   const capUtil2025 = (NIL_BASE / HOUSE_CAP_2025 * 100).toFixed(1);
-  const capUtil2028 = (proj2028Nil / houseCap(2028) * 100).toFixed(1);
+  const capUtilFc   = (proj2028Nil / houseCap(lastFcYr) * 100).toFixed(1);
 
   const kpis = [
-    { label: '2025 Total Expenses', value: fmt(costs[2025]), delta: pct(costYoy) + ' vs 2024', cls: costYoy >= 0 ? 'up' : 'down' },
-    { label: '2025 Athletics Revenue', value: fmt(revenue[2025]), delta: pct(revYoy) + ' vs 2024 · excl. univ. support', cls: revYoy >= 0 ? 'up' : 'down' },
-    { label: '3-Yr Expense CAGR', value: pct(costGrowth/3), delta: '2022 → 2025', cls: 'neutral' },
-    { label: '3-Yr Revenue CAGR', value: pct(revGrowth/3), delta: '2022 → 2025', cls: revGrowth >= 0 ? 'up' : 'down' },
-    { label: '2028 Proj. Expenses', value: fmt(proj2028Exp), delta: 'Scenario forecast', cls: 'neutral' },
-    { label: '2028 Proj. Revenue', value: fmt(proj2028Rev), delta: 'Scenario forecast', cls: 'up' },
-    { label: 'Rev Share Spend (2025)', value: fmt(NIL_BASE), delta: capUtil2025 + '% of $20.5M cap', cls: 'neutral' },
-    { label: '2028 Proj. Rev Share', value: fmt(proj2028Nil), delta: capUtil2028 + '% of ' + fmt(houseCap(2028)) + ' cap', cls: proj2028Nil >= houseCap(2028) * 0.9 ? 'down' : 'up' },
+    { label: `${latestYr} Total Expenses`, value: fmt(costs[latestYr]), delta: pct(costYoy) + ` vs ${prevYr}`, cls: costYoy >= 0 ? 'up' : 'down' },
+    { label: `${latestYr} Athletics Revenue`, value: fmt(revenue[latestYr]), delta: pct(revYoy) + ` vs ${prevYr} · excl. univ. support`, cls: revYoy >= 0 ? 'up' : 'down' },
+    { label: `${span}-Yr Expense CAGR`, value: pct(costGrowth/span), delta: `${oldestYr} → ${latestYr}`, cls: 'neutral' },
+    { label: `${span}-Yr Revenue CAGR`, value: pct(revGrowth/span), delta: `${oldestYr} → ${latestYr}`, cls: revGrowth >= 0 ? 'up' : 'down' },
+    { label: `${lastFcYr} Proj. Expenses`, value: fmt(lastFc.exp), delta: 'Scenario forecast', cls: 'neutral' },
+    { label: `${lastFcYr} Proj. Revenue`, value: fmt(lastFc.rev), delta: 'Scenario forecast', cls: 'up' },
+    { label: `Rev Share Spend (${latestYr})`, value: fmt(NIL_BASE), delta: capUtil2025 + '% of $20.5M cap', cls: 'neutral' },
+    { label: `${lastFcYr} Proj. Rev Share`, value: fmt(proj2028Nil), delta: capUtilFc + '% of ' + fmt(houseCap(lastFcYr)) + ' cap', cls: proj2028Nil >= houseCap(lastFcYr) * 0.9 ? 'down' : 'up' },
   ];
 
   document.getElementById('kpiRow').innerHTML = kpis.map(k => `
@@ -676,6 +704,7 @@ function renderKPIs() {
 let overviewChart, yoyChart, scenarioChart, revMixChart;
 
 function buildOverviewChart() {
+  if (overviewChart) { overviewChart.destroy(); overviewChart = null; }
   const sf = scenarioForecast();
   const expData = years.map(y => costs[y]);
   const expForecast = sf.map(r => r.exp);
@@ -688,17 +717,20 @@ function buildOverviewChart() {
   overviewChart = new Chart(document.getElementById('overviewChart'), {
     type: 'bar',
     data: {
-      labels: allYears.map(y => y === 2025 ? '2025*' : String(y)),
+      labels: allYears.map(y => {
+        const latestYr = Math.max(...years);
+        return y === latestYr ? y + '*' : String(y);
+      }),
       datasets: [
         {
           label: 'Expenses (Actual)',
-          data: [...expData, null, null, null, null],
+          data: [...expData, ...forecastYears.map(() => null)],
           backgroundColor: chartColor('#4f7cff', 0.7),
           order: 2,
         },
         {
           label: 'Expenses (Scenario)',
-          data: [null, null, null, expData[3], ...expForecast],
+          data: [...years.slice(0, -1).map(() => null), expData[expData.length - 1], ...expForecast],
           backgroundColor: chartColor('#4f7cff', 0.3),
           borderColor: '#4f7cff',
           borderWidth: 1,
@@ -707,13 +739,13 @@ function buildOverviewChart() {
         },
         {
           label: 'Athletics Revenue (Actual)',
-          data: [...revData, null, null, null, null],
+          data: [...revData, ...forecastYears.map(() => null)],
           backgroundColor: chartColor('#43e97b', 0.7),
           order: 2,
         },
         {
           label: 'Athletics Revenue (Scenario)',
-          data: [null, null, null, revData[3], ...revForecast],
+          data: [...years.slice(0, -1).map(() => null), revData[revData.length - 1], ...revForecast],
           backgroundColor: chartColor('#43e97b', 0.3),
           borderColor: '#43e97b',
           borderWidth: 1,
@@ -760,6 +792,7 @@ function buildOverviewChart() {
 }
 
 function buildYoyChart() {
+  if (yoyChart) { yoyChart.destroy(); yoyChart = null; }
   const expYoy = years.slice(1).map((y, i) => ((costs[y] - costs[years[i]]) / costs[years[i]]) * 100);
   const revYoy = years.slice(1).map((y, i) => ((revenue[y] - revenue[years[i]]) / revenue[years[i]]) * 100);
 
@@ -807,18 +840,13 @@ function buildScenarioChart() {
   const sf = scenarioForecast();
   const allExp = [...years.map(y => costs[y]), ...sf.map(r => r.exp)];
   const allRev = [...years.map(y => revenue[y]), ...sf.map(r => r.rev)];
-  // Rev share line: 2025 is the only known actual; rest are scenario projections
-  const allNil = [null, null, null, NIL_BASE, ...sf.map(r => r.nilProjected)];
+  // Rev share line: latest actual year is the only known; rest are scenario projections
+  const allNil = [...years.slice(0, -1).map(() => null), NIL_BASE, ...sf.map(r => r.nilProjected)];
   // House cap dashed line (forecast years only)
   const capLine = [...years.map(() => null), ...forecastYears.map(yr => houseCap(yr))];
 
-  if (scenarioChart) {
-    scenarioChart.data.datasets[0].data = allExp;
-    scenarioChart.data.datasets[1].data = allRev;
-    scenarioChart.data.datasets[2].data = allNil;
-    scenarioChart.data.datasets[3].data = capLine;
-    scenarioChart.update();
-  } else {
+  if (scenarioChart) { scenarioChart.destroy(); scenarioChart = null; }
+  {
     scenarioChart = new Chart(document.getElementById('scenarioChart'), {
       type: 'line',
       data: {
@@ -916,7 +944,6 @@ function updateScenario(key, val, unit) {
   buildScenarioChart();
   renderForecastTable();
   renderKPIs();
-  overviewChart.destroy();
   buildOverviewChart();
 }
 
@@ -929,12 +956,14 @@ function renderForecastTable() {
       revChg: i === 0 ? null : (revenue[y] - revenue[years[i-1]])/revenue[years[i-1]],
       trendExp: null, trendRev: null,
     })),
-    ...sf.map((r, i) => ({
+    ...sf.map((r, i) => {
+      const latestYr = Math.max(...years);
+      return {
       yr: r.yr, exp: r.exp, rev: r.rev, isForecast: true,
       trendExp: r.trendExp, trendRev: r.trendRev,
-      expChg: i === 0 ? (r.exp - costs[2025])/costs[2025] : (r.exp - sf[i-1].exp)/sf[i-1].exp,
-      revChg: i === 0 ? (r.rev - revenue[2025])/revenue[2025] : (r.rev - sf[i-1].rev)/sf[i-1].rev,
-    }))
+      expChg: i === 0 ? (costs[latestYr] ? (r.exp - costs[latestYr])/costs[latestYr] : null) : (r.exp - sf[i-1].exp)/sf[i-1].exp,
+      revChg: i === 0 ? (revenue[latestYr] ? (r.rev - revenue[latestYr])/revenue[latestYr] : null) : (r.rev - sf[i-1].rev)/sf[i-1].rev,
+    }})
   ];
 
   const html = `
@@ -948,7 +977,7 @@ function renderForecastTable() {
     <tbody>
       ${allRows.map(r => `
         <tr class="${r.isForecast ? 'forecast-row' : ''}">
-          <td>${r.yr}${r.yr === 2025 && !r.isForecast ? '*' : ''}</td>
+          <td>${r.yr === Math.max(...years) && !r.isForecast ? r.yr + '*' : r.yr}</td>
           <td class="trend-col">${r.trendExp !== null ? fmt(r.trendExp) : '—'}</td>
           <td class="trend-col">${r.trendRev !== null ? fmt(r.trendRev) : '—'}</td>
           <td>${fmt(r.exp)}</td>
@@ -964,6 +993,7 @@ function renderForecastTable() {
 
 // ─── REVENUE MIX DOUGHNUT ────────────────────────────────────────────────────
 function buildRevMixChart() {
+  if (revMixChart) { revMixChart.destroy(); revMixChart = null; }
   const labels = Object.keys(revMix2025);
   const data = Object.values(revMix2025);
   const colors = ['#4f7cff','#43e97b','#ff6b6b','#f6c90e','#a78bfa','#38bdf8','#fb923c','#e879f9','#34d399'];
@@ -987,7 +1017,9 @@ function buildRevMixChart() {
 // ─── EXPENSE BREAKDOWN BARS ───────────────────────────────────────────────────
 function renderExpBreakdown() {
   const max = Math.max(...topExpenses2024.map(e => e.value));
-  document.getElementById('expBreakdown').innerHTML = topExpenses2024.map(e => `
+  document.getElementById('expBreakdown').innerHTML = topExpenses2024
+    .sort((a, b) => b.value - a.value)  // sort descending for exec readability
+    .map(e => `
     <div>
       <div class="exp-row">
         <span>${e.name}</span>
@@ -998,14 +1030,112 @@ function renderExpBreakdown() {
   `).join('');
 }
 
+// ─── KEY INSIGHTS (auto-generated) ───────────────────────────────────────────
+function renderInsights() {
+  const latestYr = Math.max(...years);
+  const oldestYr = Math.min(...years);
+  const prevYr   = years.length >= 2 ? years[years.length - 2] : latestYr;
+  const insights = [];
+
+  // Revenue coverage ratio
+  const covPct = revenue[latestYr] && costs[latestYr] ? (revenue[latestYr] / costs[latestYr] * 100) : 0;
+  const gapAmt = costs[latestYr] - revenue[latestYr];
+  insights.push({
+    icon: covPct < 35 ? '\u26a0\ufe0f' : '\u2705',
+    cls: covPct < 35 ? 'negative' : 'neutral',
+    title: `Revenue covers ${covPct.toFixed(1)}% of expenses`,
+    body: `Self-generated athletics revenue is ${fmt(revenue[latestYr])} against ${fmt(costs[latestYr])} in total expenses. The university must cover the remaining ${fmt(gapAmt)} gap (${(100 - covPct).toFixed(1)}%) through institutional support.`
+  });
+
+  // Expense vs Revenue growth comparison
+  const expGr = costs[prevYr] ? ((costs[latestYr] - costs[prevYr]) / costs[prevYr] * 100) : 0;
+  const revGr = revenue[prevYr] ? ((revenue[latestYr] - revenue[prevYr]) / revenue[prevYr] * 100) : 0;
+  if (expGr > 0 && revGr > 0 && revGr > expGr) {
+    insights.push({
+      icon: '\ud83d\udcc8', cls: 'positive',
+      title: 'Revenue outpacing expenses',
+      body: `Revenue grew ${revGr.toFixed(1)}% vs expenses at ${expGr.toFixed(1)}% year-over-year. This positive trend is narrowing the funding gap.`
+    });
+  } else if (expGr > revGr) {
+    insights.push({
+      icon: '\ud83d\udcc9', cls: 'negative',
+      title: 'Expenses growing faster than revenue',
+      body: `Expenses grew ${expGr.toFixed(1)}% while revenue ${revGr > 0 ? 'only grew ' + revGr.toFixed(1) + '%' : 'declined ' + Math.abs(revGr).toFixed(1) + '%'} year-over-year. The funding gap is widening.`
+    });
+  }
+
+  // Rev share cap utilization
+  const capUtil = NIL_BASE / HOUSE_CAP_2025 * 100;
+  if (capUtil < 50) {
+    insights.push({
+      icon: '\ud83c\udfc6', cls: 'neutral',
+      title: `Only ${capUtil.toFixed(0)}% of rev share cap used`,
+      body: `At ${fmt(NIL_BASE)}, there is ${fmt(HOUSE_CAP_2025 - NIL_BASE)} of unused cap space. Peer institutions spending closer to the cap may have a competitive recruiting advantage.`
+    });
+  }
+
+  // Largest expense category
+  if (topExpenses2024.length > 0) {
+    const top = [...topExpenses2024].sort((a, b) => b.value - a.value)[0];
+    const topPct = costs[latestYr] ? (top.value / costs[latestYr] * 100) : 0;
+    insights.push({
+      icon: '\ud83d\udcb0', cls: 'neutral',
+      title: `${top.name} is the largest expense`,
+      body: `At ${fmt(top.value)}, ${top.name} represents ${topPct.toFixed(1)}% of total expenses — the single largest line item in the athletics budget.`
+    });
+  }
+
+  // Fundraising as top revenue source
+  const revEntries = Object.entries(revMix2025).sort((a, b) => b[1] - a[1]);
+  if (revEntries.length > 0) {
+    const [topRevName, topRevVal] = revEntries[0];
+    const topRevPct = revenue[latestYr] ? (topRevVal / revenue[latestYr] * 100) : 0;
+    insights.push({
+      icon: '\ud83c\udf1f', cls: 'positive',
+      title: `${topRevName} leads revenue at ${topRevPct.toFixed(0)}%`,
+      body: `${topRevName} contributes ${fmt(topRevVal)} (${topRevPct.toFixed(1)}% of total revenue), making it the most important revenue stream.`
+    });
+  }
+
+  // 3-year OLS forecast direction
+  if (olsRevForecast.length > 0 && olsExpForecast.length > 0) {
+    const lastTrendExp = olsExpForecast[olsExpForecast.length - 1];
+    const lastTrendRev = olsRevForecast[olsRevForecast.length - 1];
+    const lastFcYr = forecastYears[forecastYears.length - 1];
+    const gapNow = costs[latestYr] - revenue[latestYr];
+    const gapTrend = lastTrendExp - lastTrendRev;
+    if (gapTrend < gapNow) {
+      insights.push({
+        icon: '\u2197\ufe0f', cls: 'positive',
+        title: `Funding gap projected to narrow by ${lastFcYr}`,
+        body: `If current trends continue, the expense-revenue gap shrinks from ${fmt(gapNow)} to ${fmt(gapTrend)} by ${lastFcYr} based on OLS regression.`
+      });
+    } else {
+      insights.push({
+        icon: '\u2198\ufe0f', cls: 'negative',
+        title: `Funding gap projected to widen by ${lastFcYr}`,
+        body: `If current trends continue, the expense-revenue gap grows from ${fmt(gapNow)} to ${fmt(gapTrend)} by ${lastFcYr}. Strategic revenue growth is critical.`
+      });
+    }
+  }
+
+  document.getElementById('insightsList').innerHTML = insights.map(ins => `
+    <div class="insight-card ${ins.cls}">
+      <div class="insight-icon">${ins.icon}</div>
+      <div class="insight-title">${ins.title}</div>
+      <div class="insight-body">${ins.body}</div>
+    </div>
+  `).join('');
+}
+
 // ─── REV SHARE INVESTMENT PLANNER ────────────────────────────────────────────
 const RC = {
-  baseRS:    4970000,
-  nonRS:     39530000,
-  baseExp:   44500000,
-  baseRev:   13481528,
-  baseRatio: 44500000 / 13481528,  // 3.300813
-  cap:       20500000,
+  baseRS:    0,
+  nonRS:     0,
+  baseExp:   0,
+  baseRev:   0,
+  baseRatio: 1,
+  cap:       HOUSE_CAP_2025,
 };
 
 // Scenario rows: plain-English labels for higher-ups
@@ -1060,6 +1190,7 @@ function updateRatioCalc(sliderVal) {
   // Hero callout
   document.getElementById('rc_hero_q').textContent =
     'If we increase athlete pay by +' + pct + '%' + (c.capped ? ' (capped at NCAA max)' : '') + '...';
+  document.getElementById('rc_fromRS').textContent = fmtD(RC.baseRS);
   document.getElementById('rc_newRS').textContent  = fmtD(c.newRS);
   document.getElementById('rc_newExp').textContent = fmtD(c.newExp);
   document.getElementById('rc_reqRev').textContent = fmtD(c.reqRev);
@@ -1069,10 +1200,19 @@ function updateRatioCalc(sliderVal) {
   document.getElementById('rc_capWarning').style.display = c.capped ? 'block' : 'none';
 
   // Before / After cards
-  document.getElementById('ba_newRS').textContent  = fmtD(c.newRS);
-  document.getElementById('ba_newExp').textContent = fmtD(c.newExp);
-  document.getElementById('ba_reqRev').textContent = fmtD(c.reqRev);
-  document.getElementById('ba_capPct').textContent = c.capPct.toFixed(0) + '% of $20.5M cap';
+  document.getElementById('ba_baseRS').textContent    = fmtD(RC.baseRS);
+  document.getElementById('ba_nonRS').textContent     = fmtD(RC.nonRS);
+  document.getElementById('ba_baseExp').textContent   = fmtD(RC.baseExp);
+  document.getElementById('ba_baseRev').textContent   = fmtD(RC.baseRev);
+  document.getElementById('ba_baseRatio').textContent = RC.baseExp > 0 ? (RC.baseRev / RC.baseExp * 100).toFixed(1) + '% of expenses' : '—';
+  document.getElementById('ba_baseCapPct').textContent= (RC.baseRS / HOUSE_CAP_2025 * 100).toFixed(1) + '% of $20.5M cap';
+
+  document.getElementById('ba_newRS').textContent     = fmtD(c.newRS);
+  document.getElementById('ba_afterNonRS').textContent= fmtD(RC.nonRS) + ' (unchanged)';
+  document.getElementById('ba_newExp').textContent    = fmtD(c.newExp);
+  document.getElementById('ba_reqRev').textContent    = fmtD(c.reqRev);
+  document.getElementById('ba_afterRatio').textContent= RC.baseExp > 0 ? (RC.baseRev / RC.baseExp * 100).toFixed(1) + '% of expenses \u2713' : '—';
+  document.getElementById('ba_capPct').textContent    = c.capPct.toFixed(0) + '% of $20.5M cap';
 
   // Highlight active row in scenario table
   document.querySelectorAll('.scenario-tbl tr[data-pct]').forEach(row => {
@@ -1121,18 +1261,23 @@ function exportPDF() {
   const c30 = calcRC(30);
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  const latestYr = Math.max(...years);
+  const lastFcIdx = forecastYears.length - 1;
+  const lastFcYr  = forecastYears[lastFcIdx];
+  const lastSf    = sf[lastFcIdx] || { exp: 0, rev: 0 };
+
   document.getElementById('printCoverDate').textContent = 'Generated: ' + today;
 
   const rows = [
-    ['2025 Total Expenses', fmt(costs[2025])],
-    ['2025 Athletics Revenue (self-generated)', fmt(revenue[2025])],
-    ['Revenue covers % of expenses', (revenue[2025] / costs[2025] * 100).toFixed(1) + '%'],
+    [`${latestYr} Total Expenses`, fmt(costs[latestYr] || 0)],
+    [`${latestYr} Athletics Revenue (self-generated)`, fmt(revenue[latestYr] || 0)],
+    ['Revenue covers % of expenses', costs[latestYr] ? ((revenue[latestYr] || 0) / costs[latestYr] * 100).toFixed(1) + '%' : 'N/A'],
     ['Athlete payments (rev share)', fmt(NIL_BASE) + ' — ' + (NIL_BASE / HOUSE_CAP_2025 * 100).toFixed(1) + '% of $20.5M cap'],
     ['', ''],
-    ['2028 Projected Expenses — OLS trend', fmt(olsExpForecast[2])],
-    ['2028 Projected Revenue — OLS trend', fmt(olsRevForecast[2])],
-    ['2028 Projected Expenses — with scenario', fmt(sf[2].exp)],
-    ['2028 Projected Revenue — with scenario', fmt(sf[2].rev)],
+    [`${lastFcYr} Projected Expenses — OLS trend`, fmt(olsExpForecast[lastFcIdx] || 0)],
+    [`${lastFcYr} Projected Revenue — OLS trend`, fmt(olsRevForecast[lastFcIdx] || 0)],
+    [`${lastFcYr} Projected Expenses — with scenario`, fmt(lastSf.exp)],
+    [`${lastFcYr} Projected Revenue — with scenario`, fmt(lastSf.rev)],
     ['', ''],
     ['At +30% rev share: revenue needed', fmtD(c30.reqRev)],
     ['At +30% rev share: extra revenue required', fmtExtra(c30.revExtra) + ' (' + c30.revPct.toFixed(1) + '% increase)'],
@@ -1146,10 +1291,24 @@ function exportPDF() {
     </tr>`
   ).join('');
 
+  // Dynamic cover page subtitle & footer
+  const minYr = Math.min(...years);
+  document.getElementById('printCoverSubtitle').innerHTML =
+    `Expense &amp; Revenue Forecast &middot; ${minYr}&ndash;${lastFcYr} &middot; Based on ${latestYr}-${String(latestYr + 1).slice(2)} Budget Data`;
+  document.getElementById('printCoverMethod').textContent =
+    `Forecasting method: OLS linear regression (${minYr}\u2013${latestYr} actuals)`;
+
+  // Copy key insights into print cover
+  const insightsEl = document.getElementById('insightsList');
+  const printInsightsEl = document.getElementById('printKeyInsights');
+  if (insightsEl && printInsightsEl) {
+    printInsightsEl.innerHTML = '<h3 style="margin:18px 0 10px; font-size:1rem; color:var(--heading);">Key Insights</h3>' + insightsEl.innerHTML;
+  }
+
   window.print();
 }
 
-// ─── EXCEL FILE LOADER ────────────────────────────────────────────────────────
+// ─── EXCEL FILE LOADER (header-aware) ────────────────────────────────────────
 function parseNum(v) {
   if (!v && v !== 0) return 0;
   const s = String(v).replace(/[$,\s]/g, '');
@@ -1159,79 +1318,193 @@ function parseNum(v) {
   return isNaN(n) ? 0 : n;
 }
 
+// Build a lookup: header name → column index (case-insensitive partial match)
+function colIndex(headers, ...keywords) {
+  const lower = headers.map(h => String(h || '').toLowerCase().trim());
+  for (const kw of keywords) {
+    const idx = lower.findIndex(h => h.includes(kw.toLowerCase()));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
 async function loadFromExcel(file) {
-  const buf  = await file.arrayBuffer();
-  const wb   = XLSX.read(buf, { type: 'array' });
+  const buf = await file.arrayBuffer();
+  const wb  = XLSX.read(buf, { type: 'array' });
 
   // ─ Cost sheet ─
-  const cws   = wb.Sheets['Cost'];
-  if (!cws) throw new Error('Sheet named "Cost" not found in workbook.');
+  const cws = wb.Sheets['Cost'];
+  if (!cws) throw new Error('Sheet named "Cost" not found. Sheets found: ' + wb.SheetNames.join(', '));
   const cData = XLSX.utils.sheet_to_json(cws, { header: 1, defval: '' });
 
-  // Match rows with fiscal-year label pattern "YYYY-YY" (skips header and numeric duplicates)
-  const yearMap = { '2025-26': 2025, '2024-25': 2024, '2023-24': 2023, '2022-23': 2022 };
-  const cRows   = cData.filter(r => yearMap[String(r[0]).trim()]);
+  // Header row (row 0)
+  const cHeaders = cData[0] || [];
+  const ci = {
+    total:       colIndex(cHeaders, 'total'),
+    studentAid:  colIndex(cHeaders, 'student aid'),
+    recruiting:  colIndex(cHeaders, 'recruiting'),
+    marketing:   colIndex(cHeaders, 'marketing'),
+    coaches:     colIndex(cHeaders, 'total coaches'),
+    travel:      colIndex(cHeaders, 'travel'),
+    games:       colIndex(cHeaders, 'games'),
+    guarantees:  colIndex(cHeaders, 'guarantees'),
+    adminSal:    colIndex(cHeaders, 'admin salar'),
+    facilities:  colIndex(cHeaders, 'facilities', 'facilities maint'),
+    instSupport: colIndex(cHeaders, 'inst. support', 'institutional'),
+    equipment:   colIndex(cHeaders, 'equipment'),
+    headCoaches: colIndex(cHeaders, 'head coaches'),
+    alston:      colIndex(cHeaders, 'alston'),
+    other:       colIndex(cHeaders, 'other'),
+    nil:         colIndex(cHeaders, 'nil revenue share', 'nil rev'),
+  };
 
-  const newCosts = {};
+  // Data rows: match "YYYY-YY" fiscal year pattern
+  const cRows = cData.slice(1).filter(r => r[0] && /^\d{4}-\d{2}$/.test(String(r[0]).trim()));
+
+  // Build year map dynamically ("2025-26" → 2025, "2024-25" → 2024, etc.)
+  const newCosts    = {};
+  const resolvedYrs = [];
   cRows.forEach(r => {
-    const yr = yearMap[String(r[0]).trim()];
-    if (yr) newCosts[yr] = parseNum(r[1]);
+    const label = String(r[0]).trim();
+    const yr    = parseInt(label);  // "2025-26" → 2025
+    newCosts[yr] = parseNum(r[ci.total]);
+    resolvedYrs.push(yr);
   });
+  resolvedYrs.sort((a, b) => a - b);
 
-  const row2025cost = cRows.find(r => String(r[0]).trim() === '2025-26') || [];
-  const newNIL      = parseNum(row2025cost[36]) || NIL_BASE;
+  // Latest year row (usually budget year e.g. 2025)
+  const latestYr  = Math.max(...resolvedYrs);
+  const rowLatest = cRows.find(r => parseInt(String(r[0]).trim()) === latestYr) || [];
+  const newNIL    = ci.nil >= 0 ? parseNum(rowLatest[ci.nil]) : 0;
 
-  const row2024cost = cRows.find(r => String(r[0]).trim() === '2024-25') || [];
+  // Most recent "complete" data row for expense breakdown
+  // (the budget row often has only total + NIL, so find the newest row with actual detail)
+  const detailYrs  = cRows.filter(r => {
+    const t = ci.total >= 0 ? parseNum(r[ci.total]) : 0;
+    const detail = [ci.studentAid, ci.adminSal, ci.coaches].filter(i => i >= 0).reduce((s, i) => s + parseNum(r[i]), 0);
+    return t > 0 && detail > 0;
+  });
+  const detailRow = detailYrs.length > 0
+    ? detailYrs.reduce((best, r) => parseInt(String(r[0]).trim()) > parseInt(String(best[0]).trim()) ? r : best)
+    : rowLatest;
+  const detailYr  = parseInt(String(detailRow[0] || '0').trim());
+
   const newTopExp = [
-    { name: 'Admin Salaries',          value: parseNum(row2024cost[9])  },
-    { name: 'Head Coaches',            value: parseNum(row2024cost[20]) },
-    { name: 'Student Aid',             value: parseNum(row2024cost[2])  },
-    { name: 'Total Coaches (pkg)',     value: parseNum(row2024cost[5])  },
-    { name: 'Travel',                  value: parseNum(row2024cost[6])  },
-    { name: 'Other / Alston Benefits', value: parseNum(row2024cost[35]) },
-    { name: 'Recruiting',              value: parseNum(row2024cost[3])  },
-    { name: 'Marketing',               value: parseNum(row2024cost[4])  },
-    { name: 'Equipment',               value: parseNum(row2024cost[12]) },
-    { name: 'NIL Revenue Share',       value: newNIL },
-  ];
+    ci.adminSal    >= 0 && { name: 'Admin Salaries',          value: parseNum(detailRow[ci.adminSal]) },
+    ci.headCoaches >= 0 && { name: 'Head Coaches',            value: parseNum(detailRow[ci.headCoaches]) },
+    ci.studentAid  >= 0 && { name: 'Student Aid',             value: parseNum(detailRow[ci.studentAid]) },
+    ci.coaches     >= 0 && { name: 'Total Coaches (pkg)',     value: parseNum(detailRow[ci.coaches]) },
+    ci.travel      >= 0 && { name: 'Travel',                  value: parseNum(detailRow[ci.travel]) },
+    ci.other       >= 0 && { name: 'Other',                   value: parseNum(detailRow[ci.other]) },
+    ci.recruiting  >= 0 && { name: 'Recruiting',              value: parseNum(detailRow[ci.recruiting]) },
+    ci.marketing   >= 0 && { name: 'Marketing',               value: parseNum(detailRow[ci.marketing]) },
+    ci.equipment   >= 0 && { name: 'Equipment',               value: parseNum(detailRow[ci.equipment]) },
+    ci.nil         >= 0 && { name: 'NIL Revenue Share',       value: newNIL },
+  ].filter(Boolean).filter(e => e.value > 0);
 
   // ─ Revenue sheet ─
-  const rws   = wb.Sheets['Revenue'];
-  if (!rws) throw new Error('Sheet named "Revenue" not found in workbook.');
-  const rData = XLSX.utils.sheet_to_json(rws, { header: 1, defval: '' });
-  const rRows = rData.filter(r => r[0] && /^\d{4}$/.test(String(r[0]).trim()));
+  const rws = wb.Sheets['Revenue'];
+  if (!rws) throw new Error('Sheet named "Revenue" not found. Sheets found: ' + wb.SheetNames.join(', '));
+  const rData    = XLSX.utils.sheet_to_json(rws, { header: 1, defval: '' });
+  const rHeaders = rData[0] || [];
 
+  // Find Total column by header name
+  const riTotal = colIndex(rHeaders, 'total');
+  // Revenue source columns = everything between col A (year) and Total
+  const revSrcCols = [];
+  for (let i = 1; i < rHeaders.length; i++) {
+    if (i === riTotal) continue;
+    if (String(rHeaders[i]).trim()) revSrcCols.push({ idx: i, name: String(rHeaders[i]).trim() });
+  }
+
+  // Friendly short labels for revenue sources
+  const shortLabel = (raw) => {
+    const l = raw.toLowerCase();
+    if (l.includes('ticket'))      return 'Ticket Sales';
+    if (l.includes('guarantee'))   return 'Guarantees';
+    if (l.includes('fundrais'))    return 'Fundraising';
+    if (l.includes('media'))       return 'Media Rights';
+    if (l.includes('ncaa'))        return 'NCAA Distributions';
+    if (l.includes('conference'))  return 'Conference Distributions';
+    if (l.includes('concession') || l.includes('novelty') || l.includes('parking')) return 'Concessions/Novelty';
+    if (l.includes('royalt') || l.includes('sponsor') || l.includes('licens'))      return 'Sponsorships/Royalties';
+    if (l.includes('endow') || l.includes('invest'))                                return 'Endowment & Investments';
+    return raw.length > 25 ? raw.slice(0, 22) + '\u2026' : raw;
+  };
+
+  const rRows      = rData.slice(1).filter(r => r[0] && /^\d{4}$/.test(String(r[0]).trim()));
   const newRevenue = {};
   const newRevMix  = {};
-  const revLabels  = [
-    'Ticket Sales', 'Guarantees', 'Fundraising', 'Media Rights',
-    'NCAA Distributions', 'Conference Distributions', 'Concessions/Novelty',
-    'Sponsorships/Royalties', 'Endowment & Investments',
-  ];
 
   rRows.forEach(r => {
     const yr  = parseInt(r[0]);
-    const tot = parseNum(r[10]) || revLabels.reduce((s, _, i) => s + parseNum(r[i + 1]), 0);
+    const tot = riTotal >= 0 ? parseNum(r[riTotal]) : revSrcCols.reduce((s, c) => s + parseNum(r[c.idx]), 0);
     newRevenue[yr] = tot;
-    if (yr === 2025) revLabels.forEach((lbl, i) => { newRevMix[lbl] = parseNum(r[i + 1]); });
+    if (yr === latestYr) {
+      revSrcCols.forEach(c => { newRevMix[shortLabel(c.name)] = parseNum(r[c.idx]); });
+    }
   });
 
-  return { newCosts, newRevenue, newRevMix, newNIL, newTopExp };
+  return { newCosts, newRevenue, newRevMix, newNIL, newTopExp, years: resolvedYrs, detailYr };
 }
 
 // ─── INIT ──────────────────────────────────────────────────────────────────────────────
+let dataLoaded = false;
+
 function initDashboard() {
+  if (years.length === 0) return;  // no data yet
+  dataLoaded = true;
+
+  // Compute forecast years from the latest data year
+  const latestYr = Math.max(...years);
+  forecastYears = [latestYr + 1, latestYr + 2, latestYr + 3];
+  allYears = [...years, ...forecastYears];
+
   // Re-compute OLS now that data is finalised
   olsExpForecast = linearForecast(costs, forecastYears);
   olsRevForecast = linearForecast(revenue, forecastYears);
 
   // Keep the Rev Share Investment Planner object in sync with live data
   RC.baseRS    = NIL_BASE;
-  RC.nonRS     = costs[2025] - NIL_BASE;
-  RC.baseExp   = costs[2025];
-  RC.baseRev   = revenue[2025];
-  RC.baseRatio = costs[2025] / revenue[2025];
+  RC.nonRS     = (costs[latestYr] || 0) - NIL_BASE;
+  RC.baseExp   = costs[latestYr] || 0;
+  RC.baseRev   = revenue[latestYr] || 0;
+  RC.baseRatio = RC.baseRev > 0 ? RC.baseExp / RC.baseRev : 1;
   RC.cap       = HOUSE_CAP_2025;
+
+  // Populate dynamic explainer stats
+  const ncaa = revMix2025['NCAA Distributions'] || 0;
+  const conf = revMix2025['Conference Distributions'] || 0;
+  document.getElementById('explainerDistStat').innerHTML =
+    `$${(ncaa/1e6).toFixed(2)}M (NCAA) + $${(conf/1e6).toFixed(2)}M (Conference) = $${((ncaa+conf)/1e6).toFixed(2)}M`;
+  const capPctBase = (NIL_BASE / HOUSE_CAP_2025 * 100).toFixed(1);
+  document.getElementById('explainerCapStat').innerHTML =
+    `$${(NIL_BASE/1e6).toFixed(2)}M of $20.5M (${capPctBase}%)`;
+  const headroom = HOUSE_CAP_2025 - NIL_BASE;
+  document.getElementById('explainerHeadroom').innerHTML =
+    `~$${(headroom/1e6).toFixed(1)}M/yr above current spend (${latestYr}-${String(latestYr+1).slice(2)} cap)`;
+
+  // Populate Rev Share Investment Planner context
+  document.getElementById('ripContext').innerHTML =
+    `We currently pay athletes <strong>$${(NIL_BASE/1e6).toFixed(2)}M/year</strong> through the House Settlement program (direct payments, separate from scholarships). Our total expenses are <strong>$${(RC.baseExp/1e6).toFixed(1)}M</strong> and we self-generate <strong>$${(RC.baseRev/1e6).toFixed(1)}M</strong> in athletics revenue &mdash; the rest is covered by the university.<br><br><strong>The question:</strong> If we increase what we pay athletes, our expenses go up. How much <em>more</em> revenue do we need to bring in to keep our spending balance the same as it is today? Use the slider to find out.`;
+
+  // Hide upload prompt, show content
+  document.getElementById('uploadPrompt').style.display = 'none';
+  document.querySelectorAll('.dashboard-content').forEach(el => el.style.display = '');
+
+  // Update dynamic header text
+  const minYr = Math.min(...years);
+  const maxForecast = Math.max(...forecastYears);
+  document.getElementById('subtitleText').textContent = `Expense & Revenue Forecast \u00b7 ${minYr}\u2013${maxForecast}`;
+  document.getElementById('lastUpdatedSpan').textContent = `Latest data: ${latestYr}-${String(latestYr + 1).slice(2)} Budget`;
+
+  // Dynamic elements
+  document.getElementById('revMixTitle').textContent = `Revenue Mix (Latest Year: ${latestYr})`;
+  document.getElementById('capBarFill').style.width = capPctBase + '%';
+
+  // Enable export button now that data is loaded
+  const exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) { exportBtn.disabled = false; exportBtn.title = 'Export as PDF report'; }
 
   renderKPIs();
   buildSliders();
@@ -1243,10 +1516,11 @@ function initDashboard() {
   renderExpBreakdown();
   buildScenarioTable();
   updateRatioCalc(30);
+  renderInsights();
 }
 
 // ─── BOOTSTRAP & UPLOAD HANDLER ───────────────────────────────────────────────
-initDashboard();
+// Don't init yet — wait for upload
 
 document.getElementById('xlsxUpload').addEventListener('change', async function () {
   const file  = this.files[0];
@@ -1257,12 +1531,22 @@ document.getElementById('xlsxUpload').addEventListener('change', async function 
   badge.style.display = 'inline-flex';
   try {
     const d = await loadFromExcel(file);
-    Object.keys(d.newCosts).forEach(yr    => { costs[yr]        = d.newCosts[yr]; });
-    Object.keys(d.newRevenue).forEach(yr  => { revenue[yr]      = d.newRevenue[yr]; });
-    Object.keys(d.newRevMix).forEach(lbl  => { revMix2025[lbl]  = d.newRevMix[lbl]; });
+
+    // Update global data
+    years.length = 0;
+    years.push(...d.years);
+    costs    = d.newCosts;
+    revenue  = d.newRevenue;
+    revMix2025 = d.newRevMix;
     NIL_BASE = d.newNIL;
     topExpenses2024.length = 0;
     topExpenses2024.push(...d.newTopExp);
+
+    // Update dynamic labels
+    const latestYr = Math.max(...years);
+    const detailYr = d.detailYr;
+    document.querySelector('#breakdownSection h2').textContent = `Top Expense Categories (${detailYr} Actuals)`;
+
     badge.textContent = '\u25cf ' + file.name;
     initDashboard();
   } catch (err) {
@@ -1270,8 +1554,71 @@ document.getElementById('xlsxUpload').addEventListener('change', async function 
     badge.classList.add('error');
     badge.textContent = '\u26a0 ' + (err.message || 'Could not read file');
   }
-  this.value = ''; // allow re-uploading same file
+  this.value = '';
 });
+
+// ─── DRAG-AND-DROP SUPPORT ─────────────────────────────────────────────────
+(function() {
+  const overlay = document.getElementById('dragOverlay');
+  let dragCounter = 0;
+
+  document.addEventListener('dragenter', function(e) {
+    e.preventDefault();
+    dragCounter++;
+    if (dragCounter === 1 && overlay) overlay.classList.add('active');
+  });
+
+  document.addEventListener('dragover', function(e) {
+    e.preventDefault();
+  });
+
+  document.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) { dragCounter = 0; if (overlay) overlay.classList.remove('active'); }
+  });
+
+  document.addEventListener('drop', async function(e) {
+    e.preventDefault();
+    dragCounter = 0;
+    if (overlay) overlay.classList.remove('active');
+
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file) return;
+    if (!/\.xlsx?$/i.test(file.name)) {
+      alert('Please drop an Excel file (.xlsx)');
+      return;
+    }
+
+    // Trigger the same load flow
+    const badge = document.getElementById('dataSourceBadge');
+    badge.className = 'data-badge';
+    badge.textContent = 'Loading…';
+    badge.style.display = 'inline-flex';
+    try {
+      const d = await loadFromExcel(file);
+      years.length = 0;
+      years.push(...d.years);
+      costs    = d.newCosts;
+      revenue  = d.newRevenue;
+      revMix2025 = d.newRevMix;
+      NIL_BASE = d.newNIL;
+      topExpenses2024.length = 0;
+      topExpenses2024.push(...d.newTopExp);
+
+      const latestYr = Math.max(...years);
+      const detailYr = d.detailYr;
+      document.querySelector('#breakdownSection h2').textContent = `Top Expense Categories (${detailYr} Actuals)`;
+
+      badge.textContent = '\u25cf ' + file.name;
+      initDashboard();
+    } catch (err) {
+      console.error('[Excel load]', err);
+      badge.classList.add('error');
+      badge.textContent = '\u26a0 ' + (err.message || 'Could not read file');
+    }
+  });
+})();
 </script>
 </body>
 </html>
