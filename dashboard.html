@@ -170,6 +170,27 @@
     .traffic-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
     .rip-table-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
 
+    /* Loading overlay */
+    #loadingOverlay {
+      position: fixed; inset: 0; background: rgba(15,17,23,0.92);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 9999; gap: 16px;
+    }
+    .loader-ring {
+      width: 48px; height: 48px; border: 4px solid rgba(79,124,255,0.2);
+      border-top-color: #4f7cff; border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text { font-size: 0.85rem; color: var(--muted); }
+    .loader-sub  { font-size: 0.72rem; color: var(--border); }
+    .sheets-badge {
+      display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
+      background: rgba(67,233,123,0.12); border: 1px solid rgba(67,233,123,0.3);
+      border-radius: 20px; font-size: 0.72rem; color: #43e97b;
+    }
+    .sheets-badge.error { background: rgba(255,107,107,0.1); border-color: rgba(255,107,107,0.3); color: var(--accent2); }
+
     /* Export Button */
     .export-btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -311,6 +332,13 @@
 </head>
 <body>
 
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display:none;">
+  <div class="loader-ring"></div>
+  <div class="loader-text">Loading data from Google Sheets…</div>
+  <div class="loader-sub">Fetching Cost &amp; Revenue sheets</div>
+</div>
+
 <!-- PRINT COVER PAGE (hidden on screen, shown on print) -->
 <div class="print-cover" id="printCover">
   <div style="border-bottom:3px solid #1a56db; padding-bottom:16px; margin-bottom:32px;">
@@ -337,6 +365,7 @@
     <h1>UNI Athletics &mdash; Financial Dashboard</h1>
     <div style="margin-top:4px; font-size:0.8rem; color:var(--muted);">Expense &amp; Revenue Forecast · 2022–2028</div>
   </div>
+  <span id="dataSourceBadge" class="sheets-badge" style="display:none;">&#9679; Live from Google Sheets</span>
   <div style="display:flex; align-items:center; gap:12px;">
     <span>Last updated: 2025-26 Budget</span>
     <button class="export-btn" onclick="window.print()" id="exportBtn">
@@ -509,12 +538,19 @@
 </div>
 
 <script>
+// ─── GOOGLE SHEETS CONFIG ─────────────────────────────────────────────────────────
+// Paste your values. Sheet must be shared “Anyone with the link can view”.
+const SHEETS_CONFIG = {
+  apiKey:  'AIzaSyAuwukZtynTS1mtBeb2xOxTNbdqsgAeJvs',   // Google Cloud Console → Credentials
+  sheetId: 'https://docs.google.com/spreadsheets/d/1UJTRNxGQpjHJHNLuGaNxggqQf1S0dBgDtHVOt6IfHn0/edit?usp=sharing',  // docs.google.com/spreadsheets/d/XXXXX/edit
+};
+
 // ─── RAW DATA ─────────────────────────────────────────────────────────────────
 const years = [2022, 2023, 2024, 2025];
 const forecastYears = [2026, 2027, 2028];
 const allYears = [...years, ...forecastYears];
 
-const costs = {
+let costs = {
   2022: 42279433,
   2023: 44622483,
   2024: 43337703,
@@ -522,14 +558,14 @@ const costs = {
 };
 
 // Revenue (tracked sources only)
-const revenue = {
+let revenue = {
   2022: 1933429 + 1308000 + 3714483 + 1436387 + 1909530 + 1994771 + 51645 + 513951 + 183861,
   2023: 1879898 + 1850000 + 3655911 + 1168851 + 1979755 + 2221033 + 51259 + 562614 + 191910,
   2024: 1558994 + 1635000 + 3736402 + 1333165 + 1918529 + 2346574 + 67216 + 552246 + 176400,
   2025: 1916406 + 1995000 + 3639295 + 1677850 + 1694356 + 1806782 + 77273 + 473723 + 200843,
 };
 
-const revMix2025 = {
+let revMix2025 = {
   'Ticket Sales': 1916406,
   'Guarantees': 1995000,
   'Fundraising': 3639295,
@@ -542,12 +578,12 @@ const revMix2025 = {
 };
 
 // House Settlement constants
-const NIL_BASE = 4970000;           // 2025 rev share spend
+let NIL_BASE = 4970000;           // 2025 rev share spend (updated from Sheets)
 const HOUSE_CAP_2025 = 20500000;    // 2025-26 cap (~$20.5M)
 const HOUSE_CAP_GROWTH = 0.04;      // ~4%/yr per settlement terms
 const houseCap = (yr) => HOUSE_CAP_2025 * Math.pow(1 + HOUSE_CAP_GROWTH, yr - 2025);
 
-const topExpenses2024 = [
+let topExpenses2024 = [
   { name: 'Admin Salaries', value: 5100000 },
   { name: 'Head Coaches', value: 3730000 },
   { name: 'Student Aid', value: 10370000 },
@@ -585,9 +621,9 @@ function linearForecast(data, futureYears) {
   return futureYears.map(y => Math.max(0, slope * y + intercept));
 }
 
-// OLS trend baseline — computed once, not influenced by sliders
-const olsExpForecast = linearForecast(costs, forecastYears);
-const olsRevForecast = linearForecast(revenue, forecastYears);
+// OLS trend baseline — re-computed in initDashboard() after data loads
+let olsExpForecast = [];
+let olsRevForecast = [];
 
 function scenarioForecast() {
   // Start from OLS trend baseline, then layer slider adjustments on top
@@ -1124,17 +1160,154 @@ function exportPDF() {
   window.print();
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
-renderKPIs();
-buildSliders();
-buildOverviewChart();
-buildYoyChart();
-buildScenarioChart();
-buildRevMixChart();
-renderForecastTable();
-renderExpBreakdown();
-buildScenarioTable();
-updateRatioCalc(30);
+// ─── GOOGLE SHEETS LOADER ───────────────────────────────────────────────────────────
+function parseNum(v) {
+  if (!v && v !== 0) return 0;
+  const s = String(v).replace(/[$,\s]/g, '');
+  if (s.endsWith('M')) return parseFloat(s) * 1e6;
+  if (s.endsWith('K')) return parseFloat(s) * 1e3;
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+async function loadFromSheets() {
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.sheetId}/values`;
+  const k    = `key=${SHEETS_CONFIG.apiKey}`;
+
+  const fetchSheet = async (range) => {
+    const url = `${base}/${range}?${k}`;
+    let res;
+    try { res = await fetch(url); }
+    catch (netErr) {
+      throw new Error(
+        `Network blocked fetching "${range}". ` +
+        `If your API key has HTTP-referrer restrictions, add localhost/* in Google Cloud Console → Credentials → your key → Application restrictions.`
+      );
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const msg  = body?.error?.message || res.statusText;
+      throw new Error(`Sheets API ${res.status} for "${range}": ${msg}`);
+    }
+    return res.json();
+  };
+
+  const [cRes, rRes] = await Promise.all([
+    fetchSheet('Cost!A1:AK8'),
+    fetchSheet('Revenue!A1:K8'),
+  ]);
+
+  // Cost sheet: row 0 = headers, rows 1-4 = "2025-26" through "2022-23" fiscal year data.
+  const cRows   = (cRes.values || []).filter(r => r[0] && r[1] && /^\d{4}-\d{2}$/.test(String(r[0]).trim()));
+  const yearMap = { '2025-26': 2025, '2024-25': 2024, '2023-24': 2023, '2022-23': 2022 };
+
+  const newCosts = {};
+  cRows.forEach(r => {
+    const yr = yearMap[String(r[0]).trim()];
+    if (yr) newCosts[yr] = parseNum(r[1]);
+  });
+
+  // Column AK (index 36) = NIL Revenue Share from 2025-26 row
+  const row2025cost = cRows.find(r => String(r[0]).trim() === '2025-26') || [];
+  const newNIL      = parseNum(row2025cost[36]) || NIL_BASE;
+
+  // Top expense categories from 2024-25 row
+  const row2024cost = cRows.find(r => String(r[0]).trim() === '2024-25') || [];
+  const newTopExp = [
+    { name: 'Admin Salaries',          value: parseNum(row2024cost[9])  },
+    { name: 'Head Coaches',            value: parseNum(row2024cost[20]) },
+    { name: 'Student Aid',             value: parseNum(row2024cost[2])  },
+    { name: 'Total Coaches (pkg)',     value: parseNum(row2024cost[5])  },
+    { name: 'Travel',                  value: parseNum(row2024cost[6])  },
+    { name: 'Other / Alston Benefits', value: parseNum(row2024cost[35]) },
+    { name: 'Recruiting',              value: parseNum(row2024cost[3])  },
+    { name: 'Marketing',               value: parseNum(row2024cost[4])  },
+    { name: 'Equipment',               value: parseNum(row2024cost[12]) },
+    { name: 'NIL Revenue Share',       value: newNIL },
+  ];
+
+  // Revenue sheet: row 0 = headers, data rows have 4-digit year in col A (2025, 2024, …)
+  const rRows  = (rRes.values || []).filter(r => r[0] && /^\d{4}$/.test(String(r[0]).trim()));
+  const newRevenue = {};
+  const newRevMix  = {};
+  const revLabels  = [
+    'Ticket Sales', 'Guarantees', 'Fundraising', 'Media Rights',
+    'NCAA Distributions', 'Conference Distributions', 'Concessions/Novelty',
+    'Sponsorships/Royalties', 'Endowment & Investments',
+  ];
+
+  rRows.forEach(r => {
+    const yr  = parseInt(r[0]);
+    const tot = parseNum(r[10]) || revLabels.reduce((s, _, i) => s + parseNum(r[i + 1]), 0);
+    newRevenue[yr] = tot;
+    if (yr === 2025) revLabels.forEach((lbl, i) => { newRevMix[lbl] = parseNum(r[i + 1]); });
+  });
+
+  return { newCosts, newRevenue, newRevMix, newNIL, newTopExp };
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────────────────
+function initDashboard() {
+  // Re-compute OLS now that data is finalised
+  olsExpForecast = linearForecast(costs, forecastYears);
+  olsRevForecast = linearForecast(revenue, forecastYears);
+
+  // Keep the Rev Share Investment Planner object in sync with live data
+  RC.baseRS    = NIL_BASE;
+  RC.nonRS     = costs[2025] - NIL_BASE;
+  RC.baseExp   = costs[2025];
+  RC.baseRev   = revenue[2025];
+  RC.baseRatio = costs[2025] / revenue[2025];
+  RC.cap       = HOUSE_CAP_2025;
+
+  renderKPIs();
+  buildSliders();
+  buildOverviewChart();
+  buildYoyChart();
+  buildScenarioChart();
+  buildRevMixChart();
+  renderForecastTable();
+  renderExpBreakdown();
+  buildScenarioTable();
+  updateRatioCalc(30);
+}
+
+// ─── BOOTSTRAP ──────────────────────────────────────────────────────────────────────────────
+(async () => {
+  const overlay    = document.getElementById('loadingOverlay');
+  const badge      = document.getElementById('dataSourceBadge');
+  const configured = SHEETS_CONFIG.apiKey  !== 'PASTE_YOUR_API_KEY_HERE' &&
+                     SHEETS_CONFIG.sheetId !== 'PASTE_YOUR_SHEET_ID_HERE';
+
+  if (configured) {
+    overlay.style.display = 'flex';
+    try {
+      const d = await loadFromSheets();
+      Object.keys(d.newCosts).forEach(yr    => { costs[yr]       = d.newCosts[yr]; });
+      Object.keys(d.newRevenue).forEach(yr  => { revenue[yr]     = d.newRevenue[yr]; });
+      Object.keys(d.newRevMix).forEach(lbl  => { revMix2025[lbl] = d.newRevMix[lbl]; });
+      NIL_BASE = d.newNIL;
+      topExpenses2024.length = 0;
+      topExpenses2024.push(...d.newTopExp);
+      badge.textContent = '\u25cf Live \u2014 Google Sheets';
+      badge.style.display = 'inline-flex';
+    } catch (err) {
+      console.error('[Sheets] Load failed:', err);
+      const isFileProtocol = location.protocol === 'file:';
+      const msg = isFileProtocol
+        ? '\u26a0 Open via HTTP server (not file://) to load live data'
+        : '\u26a0 Sheets error: ' + (err.message || err);
+      badge.textContent = msg;
+      badge.classList.add('error');
+      badge.style.display = 'inline-flex';
+      badge.title = 'Full error: ' + (err.message || err) +
+        (isFileProtocol ? '\n\nFix: In terminal run:  python -m http.server 8080\nThen open:  http://localhost:8080/dashboard.html' : '');
+    }
+    overlay.style.display = 'none';
+  }
+
+  initDashboard();
+})();
 </script>
 </body>
 </html>
